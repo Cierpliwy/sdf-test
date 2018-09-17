@@ -1,0 +1,15 @@
+[package]
+name = "rayon-test"
+version = "0.1.0"
+authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
+
+[dependencies]
+image = "0.19"
+rayon = "1.0.2"
+cgmath = "0.16.1"
+rand = "0.5.5"
+glium = "0.22.0"
+rusttype = "0.7.1"
+
+[profile.release]
+debug = true
