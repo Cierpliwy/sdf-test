@@ -58,6 +58,14 @@ impl Line {
         }
     }
 
+    pub fn point(&self, t: f32) -> Point2<f32> {
+        return Point2::from_vec((1.0 - t) * self.p0.to_vec() + t * self.p1.to_vec());
+    }
+
+    pub fn area(&self) -> f32 {
+        (self.p1.x - self.p0.x) * (self.p1.y + self.p0.y) / 2.0
+    }
+
     pub fn signed_distance(&self, p: Point2<f32>) -> SignedDistance {
         let p1_p0 = self.p1 - self.p0;
         let p_p0 = p - self.p0;
@@ -142,6 +150,27 @@ impl Curve {
             min: Point2 { x: min_x, y: min_y },
             max: Point2 { x: max_x, y: max_y },
         }
+    }
+
+    pub fn point(&self, t: f32) -> Point2<f32> {
+        let nt = 1.0 - t;
+        return Point2::from_vec(
+            (nt * nt) * self.p0.to_vec()
+                + (2.0 * t * nt) * self.p1.to_vec()
+                + (t * t) * self.p2.to_vec(),
+        );
+    }
+
+    pub fn area(&self) -> f32 {
+        let mut area = 0.0;
+        let mut last_point = self.point(0.0);
+        let steps = 10;
+        for t in 1..=steps {
+            let current_point = self.point(t as f32 / steps as f32);
+            area += (current_point.x - last_point.x) * (current_point.y + last_point.y);
+            last_point = current_point;
+        }
+        area / 2.0
     }
 
     pub fn signed_distance(&self, p: Point2<f32>) -> SignedDistance {

@@ -8,7 +8,7 @@ use std::f32;
 pub enum SegmentPrimitive {
     Line(Line),
     Curve(Curve),
-    End,
+    End { clock_wise: bool },
 }
 
 impl SegmentPrimitive {
@@ -16,7 +16,7 @@ impl SegmentPrimitive {
         match self {
             SegmentPrimitive::Line(line) => Some(line.bounding_box()),
             SegmentPrimitive::Curve(curve) => Some(curve.bounding_box()),
-            SegmentPrimitive::End => None,
+            SegmentPrimitive::End { .. } => None,
         }
     }
 }
@@ -83,13 +83,13 @@ impl Shape {
         let mut mask = 0b101;
         let mut distance = [f32::MAX, f32::MAX, f32::MAX];
         let mut orthogonality = [0.0, 0.0, 0.0];
-        let mut pseudo_distance = [0.0, 0.0, 0.0];
+        let mut pseudo_distance = [f32::MAX, f32::MAX, f32::MAX];
 
         for p in &self.segments {
             let sd = match p {
                 SegmentPrimitive::Line(line) => Some(line.signed_distance(pixel)),
                 SegmentPrimitive::Curve(curve) => Some(curve.signed_distance(pixel)),
-                SegmentPrimitive::End => None,
+                SegmentPrimitive::End { .. } => None,
             };
 
             if let Some(sd) = sd {
