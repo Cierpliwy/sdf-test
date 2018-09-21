@@ -63,7 +63,7 @@ impl Line {
     }
 
     pub fn area(&self) -> f32 {
-        (self.p1.x - self.p0.x) * (self.p1.y + self.p0.y) / 2.0
+        (self.p0.x * self.p1.y - self.p1.x * self.p0.y) / 2.0
     }
 
     pub fn signed_distance(&self, p: Point2<f32>) -> SignedDistance {
@@ -162,15 +162,10 @@ impl Curve {
     }
 
     pub fn area(&self) -> f32 {
-        let mut area = 0.0;
-        let mut last_point = self.point(0.0);
-        let steps = 10;
-        for t in 1..=steps {
-            let current_point = self.point(t as f32 / steps as f32);
-            area += (current_point.x - last_point.x) * (current_point.y + last_point.y);
-            last_point = current_point;
-        }
-        area / 2.0
+        (self.p2.x * (-self.p0.y - 2.0 * self.p1.y)
+            + 2.0 * self.p1.x * (self.p2.y - self.p0.y)
+            + self.p0.x * (2.0 * self.p1.y + self.p2.y))
+            / 6.0
     }
 
     pub fn signed_distance(&self, p: Point2<f32>) -> SignedDistance {

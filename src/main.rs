@@ -76,7 +76,7 @@ fn main() {
                 }
             }
             primitives.push(SegmentPrimitive::End {
-                clock_wise: area > 0.0,
+                clock_wise: area < 0.0,
             });
         }
 

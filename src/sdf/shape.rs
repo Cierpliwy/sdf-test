@@ -84,12 +84,35 @@ impl Shape {
         let mut distance = [f32::MAX, f32::MAX, f32::MAX];
         let mut orthogonality = [0.0, 0.0, 0.0];
         let mut pseudo_distance = [f32::MAX, f32::MAX, f32::MAX];
+        let mut final_distance = [f32::MAX, f32::MAX, f32::MAX];
+        let mut segment_count = 0;
 
         for p in &self.segments {
             let sd = match p {
                 SegmentPrimitive::Line(line) => Some(line.signed_distance(pixel)),
                 SegmentPrimitive::Curve(curve) => Some(curve.signed_distance(pixel)),
-                SegmentPrimitive::End { .. } => None,
+                SegmentPrimitive::End { clock_wise } => {
+                    for i in 0..3 {
+                        if (1 << i) & mask == 0 {
+                            continue;
+                        }
+
+                        distance[i] = f32::MAX;
+                        orthogonality[i] = 0.0;
+                        if segment_count == 0 {
+                            final_distance[i] = pseudo_distance[i];
+                            continue;
+                        }
+
+                        if *clock_wise {
+                            final_distance[i] = pseudo_distance[i].max(final_distance[i]);
+                        } else {
+                            final_distance[i] = pseudo_distance[i].min(final_distance[i]);
+                        }
+                    }
+                    segment_count += 1;
+                    None
+                }
             };
 
             if let Some(sd) = sd {
@@ -107,18 +130,18 @@ impl Shape {
                     pseudo_distance[i] = -sd.sign * sd.extended_dist;
                 }
 
-                mask = match mask {
-                    0b101 => 0b011,
-                    0b011 => 0b110,
-                    _ => 0b101,
-                }
+                // mask = match mask {
+                //     0b101 => 0b011,
+                //     0b011 => 0b110,
+                //     _ => 0b101,
+                // }
             }
         }
 
         (
-            (pseudo_distance[0] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
-            (pseudo_distance[1] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
-            (pseudo_distance[2] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
+            (final_distance[0] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
+            (final_distance[1] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
+            (final_distance[2] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
         )
     }
 
