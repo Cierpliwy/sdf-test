@@ -24,12 +24,10 @@ use std::time::Instant;
 static GLOBAL: System = System;
 
 fn main() {
-    let resx = std::env::args().nth(1).unwrap().parse::<u32>().unwrap();
-    let resy = std::env::args().nth(2).unwrap().parse::<u32>().unwrap();
-    let scale = std::env::args().nth(3).unwrap().parse::<f32>().unwrap();
-    let shade = std::env::args().nth(4).unwrap().parse::<f32>().unwrap();
-    let tex_scale = std::env::args().nth(5).unwrap().parse::<f32>().unwrap();
-    let path = std::env::args().nth(6).unwrap();
+    let tex_size = std::env::args().nth(1).unwrap().parse::<u32>().unwrap();
+    let font_size = std::env::args().nth(2).unwrap().parse::<f32>().unwrap();
+    let shade_size = std::env::args().nth(3).unwrap().parse::<f32>().unwrap();
+    let path = std::env::args().nth(4).unwrap();
 
     let mut font = Vec::<u8>::new();
     std::fs::File::open(path)
@@ -42,11 +40,11 @@ fn main() {
         .filter_map(|n| std::char::from_u32(n))
         .filter_map(|c| {
             font.glyph(c)
-                .scaled(rusttype::Scale::uniform(scale))
+                .scaled(rusttype::Scale::uniform(font_size))
                 .shape()
         });
 
-    let (mut texture, mut allocator) = Texture::new(resx, resy);
+    let (mut texture, mut allocator) = Texture::new(tex_size, tex_size);
     let mut views = Vec::new();
 
     let gen_time = Instant::now();
@@ -80,7 +78,7 @@ fn main() {
             });
         }
 
-        if let Some(view) = Shape::new(primitives, &mut allocator, shade) {
+        if let Some(view) = Shape::new(primitives, &mut allocator, shade_size) {
             views.push(view);
         } else {
             break;
@@ -113,7 +111,7 @@ fn main() {
     // println!("Saved image: {:?}", save_time.elapsed());
 
     let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new();
+    let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());
     let context = glutin::ContextBuilder::new();
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
@@ -130,19 +128,19 @@ fn main() {
             &display,
             &[
                 Vertex {
-                    position: [-1.0 * tex_scale, -1.0 * tex_scale],
+                    position: [-1.0, -1.0],
                     coord: [0.0, 1.0],
                 },
                 Vertex {
-                    position: [1.0 * tex_scale, -1.0 * tex_scale],
+                    position: [1.0, -1.0],
                     coord: [1.0, 1.0],
                 },
                 Vertex {
-                    position: [1.0 * tex_scale, 1.0 * tex_scale],
+                    position: [1.0, 1.0],
                     coord: [1.0, 0.0],
                 },
                 Vertex {
-                    position: [-1.0 * tex_scale, 1.0 * tex_scale],
+                    position: [-1.0, 1.0],
                     coord: [0.0, 0.0],
                 },
             ],
@@ -175,9 +173,14 @@ fn main() {
             in vec2 position;
             in vec2 coord;
             out vec2 vCoord;
+            out float scale;
+
+            uniform vec2 mouse;
+            uniform vec2 res;
 
             void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
+                scale = mouse.x / res.x * 8.0;
+                gl_Position = vec4(position * scale, 0.0, 1.0);
                 vCoord = coord;
             }
         "#,
@@ -185,10 +188,14 @@ fn main() {
             #version 140
 
             in vec2 vCoord;
+            in float scale;
             out vec4 color;
 
             uniform sampler2D tex;
             uniform vec2 mouse;
+            uniform vec2 res;
+            uniform float tex_size;
+            uniform float shade_size;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -197,18 +204,19 @@ fn main() {
             void main() {
                 vec4 s = texture(tex, vCoord);
                 float d = median(s.r, s.g, s.b);
-                color = vec4(smoothstep(0.5 + mouse.x, 0.5 - mouse.x, d) * vec3(1.0), 1.0);
-                color = mix(color, s, mouse.y);
+                float z = 0.25 / (shade_size * scale);
+                color = vec4(smoothstep(0.5 + z, 0.5 - z, d) * vec3(1.0), 1.0);
+                color = mix(color, s, mouse.y / res.y);
             }
         "#,
     }).unwrap();
 
-    let mut pos_x = 0.0;
-    let mut pos_y = 0.0;
+    let mut mouse_x = 0.0;
+    let mut mouse_y = 0.0;
     let mut res_x = 0.0;
     let mut res_y = 0.0;
 
-    let draw = |mouse_x: f32, mouse_y: f32| {
+    let draw = |mouse_x: f32, mouse_y: f32, res_x: f32, res_y: f32| {
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         target
@@ -218,28 +226,31 @@ fn main() {
                 &program,
                 &uniform!{
                     tex: &texture,
-                    mouse: [mouse_x, mouse_y]
+                    mouse: [mouse_x, mouse_y],
+                    res: [res_x, res_y],
+                    tex_size: tex_size as f32,
+                    shade_size: shade_size
                 },
                 &Default::default(),
             ).unwrap();
         target.finish().unwrap();
     };
 
-    draw(pos_x / res_x, pos_y / res_y);
+    draw(mouse_x, mouse_y, res_x, res_y);
 
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::CloseRequested => return glutin::ControlFlow::Break,
                 glutin::WindowEvent::CursorMoved { position, .. } => {
-                    pos_x = position.x as f32;
-                    pos_y = position.y as f32;
-                    draw(pos_x / res_x, pos_y / res_y);
+                    mouse_x = position.x as f32;
+                    mouse_y = position.y as f32;
+                    draw(mouse_x, mouse_y, res_x, res_y);
                 }
                 glutin::WindowEvent::Resized(position) => {
                     res_x = position.width as f32;
                     res_y = position.height as f32;
-                    draw(pos_x / res_x, pos_y / res_y);
+                    draw(mouse_x, mouse_y, res_x, res_y);
                 }
                 _ => (),
             },

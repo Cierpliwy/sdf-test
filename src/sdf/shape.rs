@@ -67,10 +67,10 @@ impl Shape {
 
     pub fn render(&mut self, locked_texture: &LockedTexture) {
         let mut texture_view = self.texture_view.borrow_mut();
-        locked_texture.modify_view(&mut *texture_view, |x, y, _, _| {
+        locked_texture.modify_view(&mut *texture_view, |x, y, _, h| {
             let pixel = Point2::new(
                 self.segments_bb.min.x + x as f32,
-                self.segments_bb.min.y + y as f32,
+                self.segments_bb.min.y + (h - 1 - y) as f32,
             );
 
             let (rd, bd, gd) = self.render_pixel(pixel);
