@@ -146,15 +146,9 @@ impl Shape {
 
     fn is_closer_to_segment(&self, sd: &SignedDistance, distance: f32, orthogonality: f32) -> bool {
         if (sd.real_dist - distance).abs() <= 0.01 {
-            if sd.orthogonality > orthogonality {
-                true
-            } else {
-                false
-            }
-        } else if sd.real_dist < distance {
-            true
+            sd.orthogonality > orthogonality
         } else {
-            false
+            sd.real_dist < distance
         }
     }
 }
