@@ -80,11 +80,15 @@ impl Shape {
     }
 
     fn render_pixel(&self, pixel: Point2<f32>) -> (f32, f32, f32) {
+        const MAX: [f32; 3] = [f32::MAX, f32::MAX, f32::MAX];
+        const ZERO: [f32; 3] = [0.0, 0.0, 0.0];
+        let median = |c: [f32; 3]| -> f32 { c[0].min(c[1]).max(c[0].max(c[1]).min(c[2])) };
+
         let mut mask = 0b101;
-        let mut distance = [f32::MAX, f32::MAX, f32::MAX];
-        let mut orthogonality = [0.0, 0.0, 0.0];
-        let mut pseudo_distance = [f32::MAX, f32::MAX, f32::MAX];
-        let mut final_distance = [f32::MAX, f32::MAX, f32::MAX];
+        let mut distance = MAX;
+        let mut pseudo_distance = MAX;
+        let mut final_distance = MAX;
+        let mut orthogonality = ZERO;
         let mut segment_count = 0;
 
         for p in &self.segments {
@@ -92,24 +96,19 @@ impl Shape {
                 SegmentPrimitive::Line(line) => Some(line.signed_distance(pixel)),
                 SegmentPrimitive::Curve(curve) => Some(curve.signed_distance(pixel)),
                 SegmentPrimitive::End { clock_wise } => {
-                    for i in 0..3 {
-                        if (1 << i) & mask == 0 {
-                            continue;
-                        }
-
-                        distance[i] = f32::MAX;
-                        orthogonality[i] = 0.0;
-                        if segment_count == 0 {
-                            final_distance[i] = pseudo_distance[i];
-                            continue;
-                        }
-
-                        if *clock_wise {
-                            final_distance[i] = pseudo_distance[i].max(final_distance[i]);
-                        } else {
-                            final_distance[i] = pseudo_distance[i].min(final_distance[i]);
-                        }
+                    distance = MAX;
+                    orthogonality = ZERO;
+                    if segment_count == 0 {
+                        final_distance = pseudo_distance;
                     }
+
+                    let pseudo_median = median(pseudo_distance);
+                    let final_median = median(final_distance);
+
+                    if (pseudo_median > final_median) ^ !*clock_wise {
+                        final_distance = pseudo_distance;
+                    }
+
                     segment_count += 1;
                     None
                 }
@@ -130,11 +129,11 @@ impl Shape {
                     pseudo_distance[i] = -sd.sign * sd.extended_dist;
                 }
 
-                // mask = match mask {
-                //     0b101 => 0b011,
-                //     0b011 => 0b110,
-                //     _ => 0b101,
-                // }
+                mask = match mask {
+                    0b101 => 0b011,
+                    0b011 => 0b110,
+                    _ => 0b101,
+                }
             }
         }
 
