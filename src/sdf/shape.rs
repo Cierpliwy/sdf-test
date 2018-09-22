@@ -1,5 +1,6 @@
 use super::geometry::{Curve, Line, Rect, SignedDistance};
-use super::texture::{LockedTexture, TextureView, TextureViewAllocator};
+use super::texture::{Color, LockedTexture, TextureView, TextureViewAllocator};
+use super::utils::{clamp_f32, median, median_f32};
 use cgmath::Point2;
 use std::cell::RefCell;
 use std::f32;
@@ -75,14 +76,81 @@ impl Shape {
 
             let (rd, bd, gd) = self.render_pixel(pixel);
 
-            ((rd * 255.0) as u8, (gd * 255.0) as u8, (bd * 255.0) as u8)
+            Color {
+                r: (rd * 255.0) as u8,
+                g: (gd * 255.0) as u8,
+                b: (bd * 255.0) as u8,
+            }
+        });
+
+        locked_texture.correct_view(&mut *texture_view, |_, _, _, _, left, top, current| {
+            fn color_clashing(c1: Color, c2: Color) -> bool {
+                if c1.is_black() || c2.is_black() {
+                    return false;
+                }
+
+                let c1r = (c1.r >= 128) as u8;
+                let c1g = (c1.g >= 128) as u8;
+                let c1b = (c1.b >= 128) as u8;
+
+                let c2r = (c2.r >= 128) as u8;
+                let c2g = (c2.g >= 128) as u8;
+                let c2b = (c2.b >= 128) as u8;
+
+                let c1sum = c1r + c1g + c1b;
+                let c2sum = c2r + c2g + c2b;
+
+                let c1_inside = c1sum >= 2;
+                let c2_inside = c2sum >= 2;
+                if c1_inside != c2_inside {
+                    return false;
+                }
+
+                if c1sum == 0 || c1sum == 3 || c2sum == 0 || c2sum == 3 {
+                    return false;
+                }
+
+                let d1a;
+                let d1b;
+                let d2a;
+                let d2b;
+
+                if c1r == c2r {
+                    if c1b == c2b && c1g == c2g {
+                        return false;
+                    }
+                    d1b = c1.g as i16;
+                    d2b = c2.g as i16;
+                    d1a = c1.b as i16;
+                    d2a = c2.b as i16;
+                } else {
+                    if c1g == c2g {
+                        d1b = c1.r as i16;
+                        d2b = c2.r as i16;
+                        d1a = c1.b as i16;
+                        d2a = c2.b as i16;
+                    } else {
+                        d1b = c1.g as i16;
+                        d2b = c2.g as i16;
+                        d1a = c1.r as i16;
+                        d2a = c2.r as i16;
+                    }
+                }
+                (d1b - d2b).abs() > 10 && (d1a - d2a).abs() > 2
+            }
+
+            if color_clashing(left, current) || color_clashing(top, current) {
+                let m = median([current.r, current.g, current.b]);
+                Color { r: m, g: m, b: m }
+            } else {
+                current
+            }
         });
     }
 
     fn render_pixel(&self, pixel: Point2<f32>) -> (f32, f32, f32) {
         const MAX: [f32; 3] = [f32::MAX, f32::MAX, f32::MAX];
         const ZERO: [f32; 3] = [0.0, 0.0, 0.0];
-        let median = |c: [f32; 3]| -> f32 { c[0].min(c[1]).max(c[0].max(c[1]).min(c[2])) };
 
         let mut mask = 0b101;
         let mut distance = MAX;
@@ -102,8 +170,8 @@ impl Shape {
                         final_distance = pseudo_distance;
                     }
 
-                    let pseudo_median = median(pseudo_distance);
-                    let final_median = median(final_distance);
+                    let pseudo_median = median_f32(pseudo_distance);
+                    let final_median = median_f32(final_distance);
 
                     if (pseudo_median > final_median) ^ !*clock_wise {
                         final_distance = pseudo_distance;
@@ -138,9 +206,9 @@ impl Shape {
         }
 
         (
-            (final_distance[0] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
-            (final_distance[1] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
-            (final_distance[2] / self.max_distance).max(-1.0).min(1.0) * 0.5 + 0.5,
+            clamp_f32(final_distance[0] / self.max_distance, -1.0, 1.0) * 0.5 + 0.5,
+            clamp_f32(final_distance[1] / self.max_distance, -1.0, 1.0) * 0.5 + 0.5,
+            clamp_f32(final_distance[2] / self.max_distance, -1.0, 1.0) * 0.5 + 0.5,
         )
     }
 

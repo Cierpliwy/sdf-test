@@ -1,6 +1,13 @@
 use super::geometry::Rect;
 use std::marker::PhantomData;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
 pub struct Texture {
     data: Vec<u8>,
     width: u32,
@@ -30,6 +37,16 @@ unsafe impl Send for TextureView {}
 unsafe impl Sync for TextureView {}
 unsafe impl<'a> Send for LockedTexture<'a> {}
 unsafe impl<'a> Sync for LockedTexture<'a> {}
+
+impl Color {
+    pub fn black() -> Color {
+        Color { r: 0, g: 0, b: 0 }
+    }
+
+    pub fn is_black(&self) -> bool {
+        self.r == 0 && self.g == 0 && self.b == 0
+    }
+}
 
 impl Texture {
     pub fn new(width: u32, height: u32) -> (Self, TextureViewAllocator) {
@@ -144,7 +161,32 @@ impl TextureViewAllocator {
 }
 
 impl<'a> LockedTexture<'a> {
-    pub fn modify_view<F: Fn(u32, u32, u32, u32) -> (u8, u8, u8)>(
+    pub fn modify_view<F: Fn(u32, u32, u32, u32) -> Color>(&self, view: &mut TextureView, func: F) {
+        let texture = unsafe { &mut *self.texture };
+        assert!(view.data == texture.data.as_mut_slice());
+
+        for y in view.view.min.y..view.view.max.y {
+            for x in view.view.min.x..view.view.max.x {
+                let mut color = func(
+                    x - view.view.min.x,
+                    y - view.view.min.y,
+                    view.view.width(),
+                    view.view.height(),
+                );
+                let offset = 3 * (y * texture.width + x) as usize;
+                if color.is_black() {
+                    color.r = 1;
+                    color.g = 1;
+                    color.b = 1;
+                }
+                texture.data[offset] = color.r;
+                texture.data[offset + 1] = color.g;
+                texture.data[offset + 2] = color.b;
+            }
+        }
+    }
+
+    pub fn correct_view<F: Fn(u32, u32, u32, u32, Color, Color, Color) -> Color>(
         &self,
         view: &mut TextureView,
         func: F,
@@ -152,14 +194,45 @@ impl<'a> LockedTexture<'a> {
         let texture = unsafe { &mut *self.texture };
         assert!(view.data == texture.data.as_mut_slice());
 
+        fn color_at(x: u32, y: u32, width: u32, data: &[u8]) -> Color {
+            let offset = 3 * (y * width + x) as usize;
+            Color {
+                r: data[offset],
+                g: data[offset + 1],
+                b: data[offset + 2],
+            }
+        };
+
         for y in view.view.min.y..view.view.max.y {
             for x in view.view.min.x..view.view.max.x {
-                let (r, g, b) = func(
+                let color_left = {
+                    if x > 0 {
+                        color_at(x - 1, y, texture.width, &texture.data)
+                    } else {
+                        Color::black()
+                    }
+                };
+
+                let color_top = {
+                    if y > 0 {
+                        color_at(x, y - 1, texture.width, &texture.data)
+                    } else {
+                        Color::black()
+                    }
+                };
+
+                let color = color_at(x, y, texture.width, &texture.data);
+
+                let Color { r, g, b } = func(
                     x - view.view.min.x,
                     y - view.view.min.y,
                     view.view.width(),
                     view.view.height(),
+                    color_left,
+                    color_top,
+                    color,
                 );
+
                 let offset = 3 * (y * texture.width + x) as usize;
                 texture.data[offset] = r;
                 texture.data[offset + 1] = g;
