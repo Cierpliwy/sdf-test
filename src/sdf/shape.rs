@@ -1,5 +1,5 @@
 use super::geometry::{Curve, Line, Rect, SignedDistance};
-use super::texture::{Color, LockedTexture, TextureView, TextureViewAllocator};
+use super::texture::{LockedTexture, PixelView, TextureView, TextureViewAllocator};
 use super::utils::{clamp_f32, median, median_f32};
 use cgmath::Point2;
 use std::cell::RefCell;
@@ -68,83 +68,23 @@ impl Shape {
 
     pub fn render(&mut self, locked_texture: &LockedTexture) {
         let mut texture_view = self.texture_view.borrow_mut();
-        locked_texture.modify_view(&mut *texture_view, |x, y, _, h| {
+        locked_texture.modify_view(&mut *texture_view, |pixel_view| {
             let pixel = Point2::new(
-                self.segments_bb.min.x + x as f32,
-                self.segments_bb.min.y + (h - 1 - y) as f32,
+                self.segments_bb.min.x + pixel_view.x as f32,
+                self.segments_bb.min.y + (pixel_view.height - 1 - pixel_view.y) as f32,
             );
 
             let (rd, bd, gd) = self.render_pixel(pixel);
+            let mut current_pixel = [(rd * 255.0) as u8, (gd * 255.0) as u8, (bd * 255.0) as u8];
 
-            Color {
-                r: (rd * 255.0) as u8,
-                g: (gd * 255.0) as u8,
-                b: (bd * 255.0) as u8,
-            }
-        });
-
-        locked_texture.correct_view(&mut *texture_view, |_, _, _, _, left, top, current| {
-            fn color_clashing(c1: Color, c2: Color) -> bool {
-                if c1.is_black() || c2.is_black() {
-                    return false;
-                }
-
-                let c1r = (c1.r >= 128) as u8;
-                let c1g = (c1.g >= 128) as u8;
-                let c1b = (c1.b >= 128) as u8;
-
-                let c2r = (c2.r >= 128) as u8;
-                let c2g = (c2.g >= 128) as u8;
-                let c2b = (c2.b >= 128) as u8;
-
-                let c1sum = c1r + c1g + c1b;
-                let c2sum = c2r + c2g + c2b;
-
-                let c1_inside = c1sum >= 2;
-                let c2_inside = c2sum >= 2;
-                if c1_inside != c2_inside {
-                    return false;
-                }
-
-                if c1sum == 0 || c1sum == 3 || c2sum == 0 || c2sum == 3 {
-                    return false;
-                }
-
-                let d1a;
-                let d1b;
-                let d2a;
-                let d2b;
-
-                if c1r == c2r {
-                    if c1b == c2b && c1g == c2g {
-                        return false;
-                    }
-                    d1b = c1.g as i16;
-                    d2b = c2.g as i16;
-                    d1a = c1.b as i16;
-                    d2a = c2.b as i16;
-                } else {
-                    if c1g == c2g {
-                        d1b = c1.r as i16;
-                        d2b = c2.r as i16;
-                        d1a = c1.b as i16;
-                        d2a = c2.b as i16;
-                    } else {
-                        d1b = c1.g as i16;
-                        d2b = c2.g as i16;
-                        d1a = c1.r as i16;
-                        d2a = c2.r as i16;
-                    }
-                }
-                (d1b - d2b).abs() > 10 && (d1a - d2a).abs() > 2
+            if self.is_pixel_clashing(pixel_view, current_pixel) {
+                let m = median(current_pixel);
+                current_pixel[0] = m;
+                current_pixel[1] = m;
+                current_pixel[2] = m;
             }
 
-            if color_clashing(left, current) || color_clashing(top, current) {
-                let m = median([current.r, current.g, current.b]);
-                Color { r: m, g: m, b: m }
-            } else {
-                current
-            }
+            current_pixel
         });
     }
 
@@ -218,5 +158,44 @@ impl Shape {
         } else {
             sd.real_dist < distance
         }
+    }
+
+    fn is_pixel_clashing(&self, pixel_view: PixelView, current_pixel: [u8; 3]) -> bool {
+        if pixel_view.x == pixel_view.width - 1 || pixel_view.y == pixel_view.height - 1 {
+            return true;
+        }
+        self.is_pixel_pair_clashing(pixel_view.top_pixel, current_pixel)
+            || self.is_pixel_pair_clashing(pixel_view.left_pixel, current_pixel)
+    }
+
+    fn is_pixel_pair_clashing(&self, p1: [u8; 3], p2: [u8; 3]) -> bool {
+        const INSIDE_THRESHOLD: u8 = 128;
+        const CLASHING_TRESHOLD: i16 = 16;
+
+        let p1_bits = (p1[0] / INSIDE_THRESHOLD) << 0
+            | (p1[1] / INSIDE_THRESHOLD) << 1
+            | (p1[2] / INSIDE_THRESHOLD) << 2;
+
+        let p2_bits = (p2[0] / INSIDE_THRESHOLD) << 0
+            | (p2[1] / INSIDE_THRESHOLD) << 1
+            | (p2[2] / INSIDE_THRESHOLD) << 2;
+
+        if p1_bits == 0b000 || p1_bits == 0b111 || p2_bits == 0b000 || p2_bits == 0b111 {
+            return false;
+        }
+
+        let xor_bits = p1_bits ^ p2_bits;
+        if xor_bits.count_ones() != 2 {
+            return false;
+        }
+
+        let mut clashing = true;
+        for i in 0..3 {
+            if 1 << i & xor_bits != 0 && (p1[i] as i16 - p2[i] as i16).abs() < CLASHING_TRESHOLD {
+                clashing = false;
+            }
+        }
+
+        clashing
     }
 }

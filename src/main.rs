@@ -99,15 +99,15 @@ fn main() {
         println!("Rendered: {:?}", render_time.elapsed());
     }
 
-    let save_time = Instant::now();
-    image::png::PNGEncoder::new(std::fs::File::create("demo.png").unwrap())
-        .encode(
-            texture.get_data(),
-            texture.get_width(),
-            texture.get_height(),
-            image::ColorType::RGB(8),
-        ).unwrap();
-    println!("Saved image: {:?}", save_time.elapsed());
+    // let save_time = Instant::now();
+    // image::png::PNGEncoder::new(std::fs::File::create("demo.png").unwrap())
+    //     .encode(
+    //         texture.get_data(),
+    //         texture.get_width(),
+    //         texture.get_height(),
+    //         image::ColorType::RGB(8),
+    //     ).unwrap();
+    // println!("Saved image: {:?}", save_time.elapsed());
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());

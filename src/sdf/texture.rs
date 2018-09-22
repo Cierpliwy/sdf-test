@@ -1,13 +1,6 @@
 use super::geometry::Rect;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, Copy)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
 pub struct Texture {
     data: Vec<u8>,
     width: u32,
@@ -37,16 +30,6 @@ unsafe impl Send for TextureView {}
 unsafe impl Sync for TextureView {}
 unsafe impl<'a> Send for LockedTexture<'a> {}
 unsafe impl<'a> Sync for LockedTexture<'a> {}
-
-impl Color {
-    pub fn black() -> Color {
-        Color { r: 0, g: 0, b: 0 }
-    }
-
-    pub fn is_black(&self) -> bool {
-        self.r == 0 && self.g == 0 && self.b == 0
-    }
-}
 
 impl Texture {
     pub fn new(width: u32, height: u32) -> (Self, TextureViewAllocator) {
@@ -160,84 +143,48 @@ impl TextureViewAllocator {
     }
 }
 
+pub struct PixelView {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub top_pixel: [u8; 3],
+    pub left_pixel: [u8; 3],
+}
+
 impl<'a> LockedTexture<'a> {
-    pub fn modify_view<F: Fn(u32, u32, u32, u32) -> Color>(&self, view: &mut TextureView, func: F) {
+    pub fn modify_view<F: Fn(PixelView) -> [u8; 3]>(&self, view: &mut TextureView, func: F) {
         let texture = unsafe { &mut *self.texture };
         assert!(view.data == texture.data.as_mut_slice());
 
+        let mut top_pixel = [0, 0, 0];
+        let mut left_pixel = [0, 0, 0];
+
         for y in view.view.min.y..view.view.max.y {
             for x in view.view.min.x..view.view.max.x {
-                let mut color = func(
-                    x - view.view.min.x,
-                    y - view.view.min.y,
-                    view.view.width(),
-                    view.view.height(),
-                );
-                let offset = 3 * (y * texture.width + x) as usize;
-                if color.is_black() {
-                    color.r = 1;
-                    color.g = 1;
-                    color.b = 1;
+                if y > view.view.min.y {
+                    let top_offset = 3 * ((y - 1) * texture.width + x) as usize;
+                    top_pixel[0] = texture.data[top_offset];
+                    top_pixel[1] = texture.data[top_offset + 1];
+                    top_pixel[2] = texture.data[top_offset + 2];
                 }
-                texture.data[offset] = color.r;
-                texture.data[offset + 1] = color.g;
-                texture.data[offset + 2] = color.b;
-            }
-        }
-    }
 
-    pub fn correct_view<F: Fn(u32, u32, u32, u32, Color, Color, Color) -> Color>(
-        &self,
-        view: &mut TextureView,
-        func: F,
-    ) {
-        let texture = unsafe { &mut *self.texture };
-        assert!(view.data == texture.data.as_mut_slice());
-
-        fn color_at(x: u32, y: u32, width: u32, data: &[u8]) -> Color {
-            let offset = 3 * (y * width + x) as usize;
-            Color {
-                r: data[offset],
-                g: data[offset + 1],
-                b: data[offset + 2],
-            }
-        };
-
-        for y in view.view.min.y..view.view.max.y {
-            for x in view.view.min.x..view.view.max.x {
-                let color_left = {
-                    if x > 0 {
-                        color_at(x - 1, y, texture.width, &texture.data)
-                    } else {
-                        Color::black()
-                    }
-                };
-
-                let color_top = {
-                    if y > 0 {
-                        color_at(x, y - 1, texture.width, &texture.data)
-                    } else {
-                        Color::black()
-                    }
-                };
-
-                let color = color_at(x, y, texture.width, &texture.data);
-
-                let Color { r, g, b } = func(
-                    x - view.view.min.x,
-                    y - view.view.min.y,
-                    view.view.width(),
-                    view.view.height(),
-                    color_left,
-                    color_top,
-                    color,
-                );
+                let mut pixel = func(PixelView {
+                    x: x - view.view.min.x,
+                    y: y - view.view.min.y,
+                    width: view.view.width(),
+                    height: view.view.height(),
+                    top_pixel,
+                    left_pixel,
+                });
 
                 let offset = 3 * (y * texture.width + x) as usize;
-                texture.data[offset] = r;
-                texture.data[offset + 1] = g;
-                texture.data[offset + 2] = b;
+                texture.data[offset] = pixel[0];
+                texture.data[offset + 1] = pixel[1];
+                texture.data[offset + 2] = pixel[2];
+                left_pixel = pixel
             }
+            left_pixel = [0, 0, 0];
         }
     }
 }
