@@ -166,10 +166,12 @@ impl Shape {
         }
         self.is_pixel_pair_clashing(pixel_view.top_pixel, current_pixel)
             || self.is_pixel_pair_clashing(pixel_view.left_pixel, current_pixel)
+            || self.is_pixel_pair_clashing(pixel_view.top_left_pixel, current_pixel)
+            || self.is_pixel_pair_clashing(pixel_view.top_right_pixel, current_pixel)
     }
 
     fn is_pixel_pair_clashing(&self, p1: [u8; 3], p2: [u8; 3]) -> bool {
-        const INSIDE_THRESHOLD: u8 = 128;
+        const INSIDE_THRESHOLD: u8 = 127;
         const CLASHING_TRESHOLD: i16 = 16;
 
         let p1_bits = (p1[0] / INSIDE_THRESHOLD) << 0

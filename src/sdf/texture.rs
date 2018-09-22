@@ -150,6 +150,8 @@ pub struct PixelView {
     pub height: u32,
     pub top_pixel: [u8; 3],
     pub left_pixel: [u8; 3],
+    pub top_left_pixel: [u8; 3],
+    pub top_right_pixel: [u8; 3],
 }
 
 impl<'a> LockedTexture<'a> {
@@ -159,6 +161,8 @@ impl<'a> LockedTexture<'a> {
 
         let mut top_pixel = [0, 0, 0];
         let mut left_pixel = [0, 0, 0];
+        let mut top_left_pixel = [0, 0, 0];
+        let mut top_right_pixel = [0, 0, 0];
 
         for y in view.view.min.y..view.view.max.y {
             for x in view.view.min.x..view.view.max.x {
@@ -167,6 +171,14 @@ impl<'a> LockedTexture<'a> {
                     top_pixel[0] = texture.data[top_offset];
                     top_pixel[1] = texture.data[top_offset + 1];
                     top_pixel[2] = texture.data[top_offset + 2];
+
+                    if x >= view.view.max.x {
+                        top_right_pixel = [0, 0, 0];
+                    } else {
+                        top_right_pixel[0] = texture.data[top_offset + 3];
+                        top_right_pixel[1] = texture.data[top_offset + 4];
+                        top_right_pixel[2] = texture.data[top_offset + 5];
+                    }
                 }
 
                 let mut pixel = func(PixelView {
@@ -176,15 +188,20 @@ impl<'a> LockedTexture<'a> {
                     height: view.view.height(),
                     top_pixel,
                     left_pixel,
+                    top_left_pixel,
+                    top_right_pixel,
                 });
 
                 let offset = 3 * (y * texture.width + x) as usize;
                 texture.data[offset] = pixel[0];
                 texture.data[offset + 1] = pixel[1];
                 texture.data[offset + 2] = pixel[2];
-                left_pixel = pixel
+
+                left_pixel = pixel;
+                top_left_pixel = top_pixel;
             }
             left_pixel = [0, 0, 0];
+            top_left_pixel = [0, 0, 0];
         }
     }
 }
