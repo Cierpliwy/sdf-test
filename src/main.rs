@@ -6,16 +6,21 @@ extern crate rand;
 extern crate rayon;
 extern crate rusttype;
 
+pub mod renderer_thread;
 pub mod sdf;
+
 use glium::index::PrimitiveType;
 use glium::texture::ClientFormat;
 use glium::{glutin, Surface};
 use rayon::prelude::*;
-use sdf::font::create_segments_from_glyph_contours;
-use sdf::shape::Shape;
+use renderer_thread::{renderer_entry_point, RendererCommand, RendererContext, RendererResult};
+use sdf::shape::{AllocatedShape, Shape};
 use sdf::texture::Texture;
 use std::alloc::System;
 use std::io::prelude::*;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Instant;
 
 #[global_allocator]
@@ -34,51 +39,7 @@ fn main() {
         .unwrap();
     let font = rusttype::Font::from_bytes(font).unwrap();
 
-    let possible_glyphs = (64..)
-        .filter_map(|n| std::char::from_u32(n))
-        .filter_map(|c| {
-            font.glyph(c)
-                .scaled(rusttype::Scale::uniform(font_size))
-                .shape()
-        });
-
     let (mut texture, mut allocator) = Texture::new(tex_size, tex_size);
-    let mut views = Vec::new();
-
-    let gen_time = Instant::now();
-    for shape in possible_glyphs {
-        let mut primitives = create_segments_from_glyph_contours(&shape);
-        if let Some(view) = Shape::new(primitives, &mut allocator, shade_size) {
-            views.push(view);
-        } else {
-            break;
-        }
-    }
-
-    println!(
-        "{} texture views allocated: {:?}",
-        views.len(),
-        gen_time.elapsed()
-    );
-
-    {
-        let render_time = Instant::now();
-        let lock = texture.lock();
-        views.par_iter_mut().for_each(|view| {
-            view.render(&lock);
-        });
-        println!("Rendered: {:?}", render_time.elapsed());
-    }
-
-    // let save_time = Instant::now();
-    // image::png::PNGEncoder::new(std::fs::File::create("demo.png").unwrap())
-    //     .encode(
-    //         texture.get_data(),
-    //         texture.get_width(),
-    //         texture.get_height(),
-    //         image::ColorType::RGB(8),
-    //     ).unwrap();
-    // println!("Saved image: {:?}", save_time.elapsed());
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());
@@ -123,17 +84,11 @@ fn main() {
         &[0u16, 1, 2, 2, 3, 0],
     ).unwrap();
 
-    let image = glium::texture::RawImage2d {
-        data: std::borrow::Cow::Borrowed(texture.get_data()),
-        width: texture.get_width(),
-        height: texture.get_height(),
-        format: ClientFormat::U8U8U8,
-    };
-
-    let texture = glium::texture::Texture2d::with_mipmaps(
+    let gl_texture = glium::texture::Texture2d::empty_with_mipmaps(
         &display,
-        image,
         glium::texture::MipmapsOption::NoMipmap,
+        texture.get_width(),
+        texture.get_height(),
     ).unwrap();
 
     let program = program!(&display, 140 => {
@@ -196,7 +151,7 @@ fn main() {
                 &index_buffer,
                 &program,
                 &uniform!{
-                    tex: &texture,
+                    tex: &gl_texture,
                     mouse: [mouse_x, mouse_y],
                     res: [res_x, res_y],
                     tex_size: tex_size as f32,
@@ -207,8 +162,20 @@ fn main() {
         target.finish().unwrap();
     };
 
-    draw(mouse_x, mouse_y, res_x, res_y);
+    let (renderer_command_sender, renderer_command_receiver) = channel();
+    let (renderer_result_sender, renderer_result_receiver) = channel();
+    let renderer_context = RendererContext {
+        receiver: renderer_command_receiver,
+        sender: renderer_result_sender,
+        proxy: events_loop.create_proxy(),
+    };
+    let renderer_thread = thread::spawn(|| {
+        renderer_entry_point(renderer_context).expect("Got an error on renderer thread");
+    });
 
+    let texture = Arc::new(Mutex::new(texture));
+
+    draw(mouse_x, mouse_y, res_x, res_y);
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
@@ -223,10 +190,64 @@ fn main() {
                     res_y = position.height as f32;
                     draw(mouse_x, mouse_y, res_x, res_y);
                 }
+                glutin::WindowEvent::ReceivedCharacter(c) => {
+                    let glyph = font.glyph(c);
+                    if let Some(font_shape) =
+                        glyph.scaled(rusttype::Scale::uniform(font_size)).shape()
+                    {
+                        if let Some(view) = AllocatedShape::new(
+                            font_shape.as_slice().into(),
+                            &mut allocator,
+                            shade_size,
+                        ) {
+                            renderer_command_sender
+                                .send(RendererCommand::RenderShapes {
+                                    texture: texture.clone(),
+                                    shapes: vec![view],
+                                }).expect("Coudn't send initial shapes");
+                        }
+                    }
+                }
                 _ => (),
             },
             _ => (),
         }
+
+        let result = renderer_result_receiver.try_recv();
+        if let Ok(result) = result {
+            match result {
+                RendererResult::ShapesRendered { texture, .. } => {
+                    let texture = texture.lock().unwrap();
+                    let texture_upload_time = Instant::now();
+                    let image = glium::texture::RawImage2d {
+                        data: std::borrow::Cow::Borrowed(texture.get_data()),
+                        width: texture.get_width(),
+                        height: texture.get_height(),
+                        format: ClientFormat::U8U8U8,
+                    };
+                    gl_texture.write(
+                        glium::Rect {
+                            left: 0,
+                            bottom: 0,
+                            width: texture.get_width(),
+                            height: texture.get_height(),
+                        },
+                        image,
+                    );
+                    println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
+                    draw(mouse_x, mouse_y, res_x, res_y);
+                }
+            }
+        }
+
         glutin::ControlFlow::Continue
     });
+
+    renderer_command_sender
+        .send(RendererCommand::Exit)
+        .expect("Coudn't terminate renderer thread before exit.");
+
+    renderer_thread
+        .join()
+        .expect("Couldn't join renderer thread");
 }

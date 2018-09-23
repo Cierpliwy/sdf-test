@@ -31,6 +31,12 @@ unsafe impl Sync for TextureView {}
 unsafe impl<'a> Send for LockedTexture<'a> {}
 unsafe impl<'a> Sync for LockedTexture<'a> {}
 
+impl TextureView {
+    pub fn get_view(&self) -> Rect<u32> {
+        self.view
+    }
+}
+
 impl Texture {
     pub fn new(width: u32, height: u32) -> (Self, TextureViewAllocator) {
         let mut texture = Texture {
