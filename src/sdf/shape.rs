@@ -1,6 +1,6 @@
 use super::geometry::{Curve, Line, Rect, SignedDistance};
 use super::texture::{LockedTexture, PixelView, TextureView, TextureViewAllocator};
-use super::utils::{clamp_f32, median, median_f32};
+use super::utils::{clamp_f32, max, median, median_f32, min};
 use cgmath::Point2;
 use std::cell::RefCell;
 use std::f32;
@@ -171,16 +171,21 @@ impl Shape {
     }
 
     fn is_pixel_pair_clashing(&self, p1: [u8; 3], p2: [u8; 3]) -> bool {
-        const INSIDE_THRESHOLD: u8 = 127;
-        const CLASHING_TRESHOLD: i16 = 16;
+        let clashing_threshold = (128.0 / self.max_distance) as i16 + 1;
 
-        let p1_bits = (p1[0] / INSIDE_THRESHOLD) << 0
-            | (p1[1] / INSIDE_THRESHOLD) << 1
-            | (p1[2] / INSIDE_THRESHOLD) << 2;
+        let p1_min = min(p1);
+        let p1_threshold = (max(p1) - p1_min) / 2 + 1;
 
-        let p2_bits = (p2[0] / INSIDE_THRESHOLD) << 0
-            | (p2[1] / INSIDE_THRESHOLD) << 1
-            | (p2[2] / INSIDE_THRESHOLD) << 2;
+        let p1_bits = (p1[0] - p1_min) / p1_threshold << 0
+            | (p1[1] - p1_min) / p1_threshold << 1
+            | (p1[2] - p1_min) / p1_threshold << 2;
+
+        let p2_min = min(p2);
+        let p2_threshold = (max(p2) - p2_min) / 2 + 1;
+
+        let p2_bits = (p2[0] - p2_min) / p2_threshold << 0
+            | (p2[1] - p2_min) / p2_threshold << 1
+            | (p2[2] - p2_min) / p2_threshold << 2;
 
         if p1_bits == 0b000 || p1_bits == 0b111 || p2_bits == 0b000 || p2_bits == 0b111 {
             return false;
@@ -193,7 +198,7 @@ impl Shape {
 
         let mut clashing = true;
         for i in 0..3 {
-            if 1 << i & xor_bits != 0 && (p1[i] as i16 - p2[i] as i16).abs() < CLASHING_TRESHOLD {
+            if 1 << i & xor_bits != 0 && (p1[i] as i16 - p2[i] as i16).abs() < clashing_threshold {
                 clashing = false;
             }
         }

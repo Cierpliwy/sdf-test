@@ -36,7 +36,7 @@ fn main() {
         .unwrap();
     let font = rusttype::Font::from_bytes(font).unwrap();
 
-    let possible_glyphs = (32..)
+    let possible_glyphs = (64..)
         .filter_map(|n| std::char::from_u32(n))
         .filter_map(|c| {
             font.glyph(c)
@@ -177,8 +177,8 @@ fn main() {
                 vec4 s = texture(tex, vCoord);
                 float d = median(s.r, s.g, s.b);
                 float z = 0.25 / (shade_size * scale);
-                color = vec4(smoothstep(0.5 + z, 0.5 - z, d) * vec3(1.0), 1.0);
-                color = mix(color, s, mouse.y / res.y);
+                float h = mouse.y / res.y;
+                color = vec4(smoothstep(h + z, h - z, d) * vec3(1.0), 1.0);
             }
         "#,
     }).unwrap();
