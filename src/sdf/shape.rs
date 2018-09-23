@@ -140,7 +140,16 @@ impl Shape {
 
                     distance[i] = sd.real_dist;
                     orthogonality[i] = sd.orthogonality;
-                    pseudo_distance[i] = -sd.sign * sd.extended_dist;
+
+                    const START_THRESHOLD: f32 = 0.3;
+                    const END_THRESHOLD: f32 = 0.5;
+
+                    let mut rd =
+                        (sd.real_dist / self.max_distance - START_THRESHOLD) / END_THRESHOLD;
+                    rd = clamp_f32(rd, 0.0, 1.0);
+
+                    pseudo_distance[i] =
+                        -sd.sign * ((1.0 - rd) * sd.extended_dist + rd * sd.real_dist);
                 }
             }
         }

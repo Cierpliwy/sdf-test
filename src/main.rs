@@ -178,7 +178,8 @@ fn main() {
                 float d = median(s.r, s.g, s.b);
                 float z = 0.25 / (shade_size * scale);
                 float h = mouse.y / res.y;
-                color = vec4(smoothstep(h + z, h - z, d) * vec3(1.0), 1.0);
+                vec4 shadow = vec4(mix(vec3(1.0), vec3(0.8, 0.8, 0.8), smoothstep(h*h, h, d)), 1.0);
+                color = mix(shadow, vec4(0.0, 0.0, 0.0, 1.0), smoothstep(h - z, h + z, d));
             }
         "#,
     }).unwrap();
