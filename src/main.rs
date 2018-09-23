@@ -7,14 +7,12 @@ extern crate rayon;
 extern crate rusttype;
 
 pub mod sdf;
-use cgmath::Point2;
 use glium::index::PrimitiveType;
 use glium::texture::ClientFormat;
 use glium::{glutin, Surface};
 use rayon::prelude::*;
 use sdf::font::create_segments_from_glyph_contours;
-use sdf::geometry::{Curve, Line};
-use sdf::shape::{SegmentPrimitive, Shape};
+use sdf::shape::Shape;
 use sdf::texture::Texture;
 use std::alloc::System;
 use std::io::prelude::*;
