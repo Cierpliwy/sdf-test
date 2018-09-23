@@ -1,5 +1,5 @@
 [package]
-name = "rayon-test"
+name = "sdf-test"
 version = "0.1.0"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
 
