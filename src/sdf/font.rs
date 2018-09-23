@@ -9,9 +9,19 @@ pub fn create_segments_from_glyph_contours(contours: &Vec<Contour>) -> Vec<Segme
     for contour in contours {
         let segments_count = contour.segments.len();
         let mut area = 0.0;
-        let mut mask = if segments_count > 1 { 0b110 } else { 0b111 };
+        let mut mask = 0;
 
         for (index, segment) in contour.segments.iter().enumerate() {
+            mask = match mask {
+                0b110 => 0b011,
+                0b011 => 0b101,
+                _ => if index + 1 >= segments_count {
+                    0b011
+                } else {
+                    0b110
+                },
+            };
+
             match segment {
                 Segment::Line(line) => {
                     let line = Line {
@@ -31,16 +41,6 @@ pub fn create_segments_from_glyph_contours(contours: &Vec<Contour>) -> Vec<Segme
                     segments.push(SegmentPrimitive::Curve { curve, mask });
                 }
             }
-
-            mask = match mask {
-                0b110 => 0b011,
-                0b011 => 0b101,
-                _ => if index + 2 >= segments_count {
-                    0b011
-                } else {
-                    0b110
-                },
-            };
         }
         segments.push(SegmentPrimitive::End {
             clock_wise: area < 0.0,
