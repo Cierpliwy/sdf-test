@@ -7,16 +7,16 @@ use std::f32;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SegmentPrimitive {
-    Line(Line),
-    Curve(Curve),
+    Line { line: Line, mask: u8 },
+    Curve { curve: Curve, mask: u8 },
     End { clock_wise: bool },
 }
 
 impl SegmentPrimitive {
     pub fn bounding_box(&self) -> Option<Rect<f32>> {
         match self {
-            SegmentPrimitive::Line(line) => Some(line.bounding_box()),
-            SegmentPrimitive::Curve(curve) => Some(curve.bounding_box()),
+            SegmentPrimitive::Line { line, .. } => Some(line.bounding_box()),
+            SegmentPrimitive::Curve { curve, .. } => Some(curve.bounding_box()),
             SegmentPrimitive::End { .. } => None,
         }
     }
@@ -92,17 +92,23 @@ impl Shape {
         const MAX: [f32; 3] = [f32::MAX, f32::MAX, f32::MAX];
         const ZERO: [f32; 3] = [0.0, 0.0, 0.0];
 
-        let mut mask = 0b101;
         let mut distance = MAX;
         let mut pseudo_distance = MAX;
         let mut final_distance = MAX;
         let mut orthogonality = ZERO;
         let mut segment_count = 0;
+        let mut current_mask = 0;
 
         for p in &self.segments {
             let sd = match p {
-                SegmentPrimitive::Line(line) => Some(line.signed_distance(pixel)),
-                SegmentPrimitive::Curve(curve) => Some(curve.signed_distance(pixel)),
+                SegmentPrimitive::Line { line, mask } => {
+                    current_mask = *mask;
+                    Some(line.signed_distance(pixel))
+                }
+                SegmentPrimitive::Curve { curve, mask } => {
+                    current_mask = *mask;
+                    Some(curve.signed_distance(pixel))
+                }
                 SegmentPrimitive::End { clock_wise } => {
                     distance = MAX;
                     orthogonality = ZERO;
@@ -124,7 +130,7 @@ impl Shape {
 
             if let Some(sd) = sd {
                 for i in 0..3 {
-                    if (1 << i) & mask == 0 {
+                    if (1 << i) & current_mask == 0 {
                         continue;
                     }
 
@@ -135,12 +141,6 @@ impl Shape {
                     distance[i] = sd.real_dist;
                     orthogonality[i] = sd.orthogonality;
                     pseudo_distance[i] = -sd.sign * sd.extended_dist;
-                }
-
-                mask = match mask {
-                    0b101 => 0b011,
-                    0b011 => 0b110,
-                    _ => 0b101,
                 }
             }
         }

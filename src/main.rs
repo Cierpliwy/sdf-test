@@ -12,6 +12,7 @@ use glium::index::PrimitiveType;
 use glium::texture::ClientFormat;
 use glium::{glutin, Surface};
 use rayon::prelude::*;
+use sdf::font::create_segments_from_glyph_contours;
 use sdf::geometry::{Curve, Line};
 use sdf::shape::{SegmentPrimitive, Shape};
 use sdf::texture::Texture;
@@ -48,35 +49,7 @@ fn main() {
 
     let gen_time = Instant::now();
     for shape in possible_glyphs {
-        let mut primitives = Vec::new();
-        for contour in shape {
-            let mut area = 0.0;
-            for segment in contour.segments {
-                match segment {
-                    rusttype::Segment::Line(line) => {
-                        let line = Line {
-                            p0: Point2::new(line.p[0].x, line.p[0].y),
-                            p1: Point2::new(line.p[1].x, line.p[1].y),
-                        };
-                        area += line.area();
-                        primitives.push(SegmentPrimitive::Line(line));
-                    }
-                    rusttype::Segment::Curve(curve) => {
-                        let curve = Curve {
-                            p0: Point2::new(curve.p[0].x, curve.p[0].y),
-                            p1: Point2::new(curve.p[1].x, curve.p[1].y),
-                            p2: Point2::new(curve.p[2].x, curve.p[2].y),
-                        };
-                        area += curve.area();
-                        primitives.push(SegmentPrimitive::Curve(curve));
-                    }
-                }
-            }
-            primitives.push(SegmentPrimitive::End {
-                clock_wise: area < 0.0,
-            });
-        }
-
+        let mut primitives = create_segments_from_glyph_contours(&shape);
         if let Some(view) = Shape::new(primitives, &mut allocator, shade_size) {
             views.push(view);
         } else {

@@ -1,3 +1,4 @@
+pub mod font;
 pub mod geometry;
 pub mod shape;
 pub mod solver;
