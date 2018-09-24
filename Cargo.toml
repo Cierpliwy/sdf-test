@@ -11,5 +11,3 @@ rand = "0.5.5"
 glium = "0.22.0"
 rusttype = "0.7.1"
 
-[profile.release]
-debug = true
