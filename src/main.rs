@@ -173,7 +173,23 @@ fn main() {
         renderer_entry_point(renderer_context).expect("Got an error on renderer thread");
     });
 
+    let initial_shapes = (32..512)
+        .filter_map(|n| std::char::from_u32(n))
+        .filter_map(|c| {
+            font.glyph(c)
+                .scaled(rusttype::Scale::uniform(font_size))
+                .shape()
+        }).filter_map(|shape| {
+            AllocatedShape::new(shape.as_slice().into(), &mut allocator, shade_size)
+        }).collect();
+
     let texture = Arc::new(Mutex::new(texture));
+
+    renderer_command_sender
+        .send(RendererCommand::RenderShapes {
+            texture: texture.clone(),
+            shapes: initial_shapes,
+        }).expect("Coudn't send initial shapes");
 
     draw(mouse_x, mouse_y, res_x, res_y);
     events_loop.run_forever(|event| {
