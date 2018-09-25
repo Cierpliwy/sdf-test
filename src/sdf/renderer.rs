@@ -1,5 +1,5 @@
 use super::geometry::SignedDistance;
-use super::shape::{AllocatedShape, Segment, Shape};
+use super::shape::{AllocatedShape, Shape, ShapeSegment};
 use super::texture::{LockedTexture, PixelView};
 use super::utils::{clamp_f32, max, median, median_f32, min};
 use cgmath::Point2;
@@ -44,15 +44,15 @@ fn render_shape_pixel(shape: &Shape, max_distance: f32, pixel: Point2<f32>) -> (
 
     for p in shape.get_segments() {
         let sd = match p {
-            Segment::Line { line, mask } => {
+            ShapeSegment::Line { line, mask } => {
                 current_mask = *mask;
                 Some(line.signed_distance(pixel))
             }
-            Segment::Curve { curve, mask } => {
+            ShapeSegment::Curve { curve, mask } => {
                 current_mask = *mask;
                 Some(curve.signed_distance(pixel))
             }
-            Segment::End { clock_wise } => {
+            ShapeSegment::End { clock_wise } => {
                 distance = MAX;
                 orthogonality = ZERO;
                 if segment_count == 0 {

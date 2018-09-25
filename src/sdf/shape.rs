@@ -1,34 +1,35 @@
 use super::geometry::{Curve, Line, Rect};
 use super::texture::{TextureView, TextureViewAllocator};
 use std::f32;
+use std::iter::FromIterator;
 
 pub struct Shape {
-    segments: Vec<Segment>,
+    segments: Vec<ShapeSegment>,
 }
 
 impl Shape {
-    pub fn new(segments: Vec<Segment>) -> Self {
+    pub fn new(segments: Vec<ShapeSegment>) -> Self {
         Self { segments }
     }
 
-    pub fn get_segments(&self) -> &[Segment] {
+    pub fn get_segments(&self) -> &[ShapeSegment] {
         &self.segments
     }
 }
 
 #[derive(Clone, Copy)]
-pub enum Segment {
+pub enum ShapeSegment {
     Line { line: Line, mask: u8 },
     Curve { curve: Curve, mask: u8 },
     End { clock_wise: bool },
 }
 
-impl Segment {
+impl ShapeSegment {
     pub fn bounding_box(&self) -> Option<Rect<f32>> {
         match self {
-            Segment::Line { line, .. } => Some(line.bounding_box()),
-            Segment::Curve { curve, .. } => Some(curve.bounding_box()),
-            Segment::End { .. } => None,
+            ShapeSegment::Line { line, .. } => Some(line.bounding_box()),
+            ShapeSegment::Curve { curve, .. } => Some(curve.bounding_box()),
+            ShapeSegment::End { .. } => None,
         }
     }
 }
@@ -75,5 +76,63 @@ impl AllocatedShape {
             texture_view,
             max_distance,
         })
+    }
+}
+
+pub enum Segment {
+    Start { count: usize },
+    Line { line: Line },
+    Curve { curve: Curve },
+}
+
+impl<'a> FromIterator<Segment> for Shape {
+    fn from_iter<T: IntoIterator<Item = Segment>>(segments: T) -> Self {
+        let mut shape_segments = Vec::new();
+        let mut area = 0.0;
+        let mut mask = 0;
+        let mut remaining_segments = 0;
+
+        fn next_mask(mask: u8, remaining_segments: usize) -> u8 {
+            match mask {
+                0b110 => 0b011,
+                0b011 => 0b101,
+                _ => if remaining_segments == 0 {
+                    0b011
+                } else {
+                    0b110
+                },
+            }
+        };
+
+        let mut iter = segments.into_iter();
+        while let Some(segment) = iter.next() {
+            match segment {
+                Segment::Start { count } => {
+                    remaining_segments = count;
+                    mask = 0;
+                    area = 0.0;
+                }
+                Segment::Line { line } => {
+                    area += line.area();
+                    remaining_segments -= 1;
+                    mask = next_mask(mask, remaining_segments);
+                    shape_segments.push(ShapeSegment::Line { line, mask });
+                }
+                Segment::Curve { curve } => {
+                    area += curve.area();
+                    remaining_segments -= 1;
+                    mask = next_mask(mask, remaining_segments);
+                    shape_segments.push(ShapeSegment::Curve { curve, mask });
+                }
+            }
+
+            if remaining_segments == 0 {
+                shape_segments.push(ShapeSegment::End {
+                    clock_wise: area < 0.0,
+                });
+            }
+        }
+
+        Shape::new(shape_segments)
     }
 }

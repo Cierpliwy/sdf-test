@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::Read;
+use std::iter::{once, FromIterator};
 
 pub enum SDFFontError {
     CannotOpenFont(io::Error),
@@ -116,49 +117,26 @@ impl SDFFont {
 
 impl<'a> From<&'a [Contour]> for Shape {
     fn from(contours: &'a [Contour]) -> Shape {
-        let mut segments = Vec::new();
-
-        for contour in contours {
-            let segments_count = contour.segments.len();
-            let mut area = 0.0;
-            let mut mask = 0;
-
-            for (index, segment) in contour.segments.iter().enumerate() {
-                mask = match mask {
-                    0b110 => 0b011,
-                    0b011 => 0b101,
-                    _ => if index + 1 >= segments_count {
-                        0b011
-                    } else {
-                        0b110
+        let segments = contours.iter().flat_map(|contour| {
+            once(Segment::Start {
+                count: contour.segments.len(),
+            }).chain(contour.segments.iter().map(|segment| match segment {
+                FontSegment::Line(line) => Segment::Line {
+                    line: Line {
+                        p0: Point2::new(line.p[0].x, line.p[0].y),
+                        p1: Point2::new(line.p[1].x, line.p[1].y),
                     },
-                };
+                },
+                FontSegment::Curve(curve) => Segment::Curve {
+                    curve: Curve {
+                        p0: Point2::new(curve.p[0].x, curve.p[0].y),
+                        p1: Point2::new(curve.p[1].x, curve.p[1].y),
+                        p2: Point2::new(curve.p[2].x, curve.p[2].y),
+                    },
+                },
+            }))
+        });
 
-                match segment {
-                    FontSegment::Line(line) => {
-                        let line = Line {
-                            p0: Point2::new(line.p[0].x, line.p[0].y),
-                            p1: Point2::new(line.p[1].x, line.p[1].y),
-                        };
-                        area += line.area();
-                        segments.push(Segment::Line { line, mask });
-                    }
-                    FontSegment::Curve(curve) => {
-                        let curve = Curve {
-                            p0: Point2::new(curve.p[0].x, curve.p[0].y),
-                            p1: Point2::new(curve.p[1].x, curve.p[1].y),
-                            p2: Point2::new(curve.p[2].x, curve.p[2].y),
-                        };
-                        area += curve.area();
-                        segments.push(Segment::Curve { curve, mask });
-                    }
-                }
-            }
-            segments.push(Segment::End {
-                clock_wise: area < 0.0,
-            });
-        }
-
-        Shape::new(segments)
+        Shape::from_iter(segments)
     }
 }
