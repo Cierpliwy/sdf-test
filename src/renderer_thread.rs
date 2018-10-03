@@ -1,10 +1,8 @@
 use glium::glutin::EventsLoopProxy;
 use rayon::prelude::*;
+use sdf::font::TextureRenderBatch;
 use sdf::renderer::render_shape;
-use sdf::shape::AllocatedShape;
-use sdf::texture::Texture;
 use std::sync::mpsc::{Receiver, RecvError, Sender};
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 pub struct RendererContext {
@@ -14,18 +12,12 @@ pub struct RendererContext {
 }
 
 pub enum RendererCommand {
-    RenderShapes {
-        texture: Arc<Mutex<Texture>>,
-        shapes: Vec<AllocatedShape>,
-    },
+    RenderShapes(TextureRenderBatch),
     Exit,
 }
 
 pub enum RendererResult {
-    ShapesRendered {
-        texture: Arc<Mutex<Texture>>,
-        shapes: Vec<AllocatedShape>,
-    },
+    ShapesRendered(TextureRenderBatch),
 }
 
 pub fn renderer_entry_point(context: RendererContext) -> Result<(), RecvError> {
@@ -33,31 +25,28 @@ pub fn renderer_entry_point(context: RendererContext) -> Result<(), RecvError> {
     loop {
         let command = context.receiver.recv()?;
         match command {
-            RendererCommand::RenderShapes {
-                texture,
-                mut shapes,
-            } => {
+            RendererCommand::RenderShapes(mut batch) => {
                 {
-                    let mut texture_mutex = texture.lock().unwrap();
+                    let mut texture_mutex = batch.texture.lock().unwrap();
                     let render_time = Instant::now();
 
                     let texture_lock = texture_mutex.lock();
 
-                    println!("Rendering {} shape(s)...", shapes.len());
+                    println!("Rendering {} shape(s)...", batch.allocated_shapes.len());
 
-                    shapes.par_iter_mut().for_each(|shape| {
+                    batch.allocated_shapes.par_iter_mut().for_each(|shape| {
                         render_shape(shape, &texture_lock);
                     });
 
                     println!(
                         "Finished rendering {} shape(s) in {:?}.",
-                        shapes.len(),
+                        batch.allocated_shapes.len(),
                         render_time.elapsed()
                     );
                 }
                 context
                     .sender
-                    .send(RendererResult::ShapesRendered { texture, shapes })
+                    .send(RendererResult::ShapesRendered(batch))
                     .unwrap_or_else(|_| {
                         println!("Coudn't send rendered shapes result");
                     })

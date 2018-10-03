@@ -14,7 +14,8 @@ pub fn render_shape(allocated_shape: &mut AllocatedShape, locked_texture: &Locke
     locked_texture.modify_view(&mut texture_view, |pixel_view| {
         let pixel = Point2::new(
             bb.min.x + pixel_view.x as f32,
-            bb.min.y + (pixel_view.height - 1 - pixel_view.y) as f32,
+            // bb.min.y + (pixel_view.height - 1 - pixel_view.y) as f32,
+            bb.min.y + pixel_view.y as f32,
         );
 
         let (rd, bd, gd) = render_shape_pixel(shape, max_distance, pixel);
