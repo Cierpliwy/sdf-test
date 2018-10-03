@@ -1,4 +1,4 @@
-use super::solver::solve_cubic;
+use super::math::solve_cubic;
 use cgmath::prelude::*;
 use cgmath::{dot, Point2, Vector2};
 use std::f32::MAX;

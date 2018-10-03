@@ -1,7 +1,7 @@
 use super::geometry::SignedDistance;
+use super::math::{clamp_f32, max, median, median_f32, min};
 use super::shape::{AllocatedShape, Shape, ShapeSegment};
 use super::texture::{LockedTexture, PixelView};
-use super::utils::{clamp_f32, max, median, median_f32, min};
 use cgmath::Point2;
 use std::f32;
 
