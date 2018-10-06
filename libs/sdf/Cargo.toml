@@ -1,10 +1,8 @@
 [package]
-name = "sdf-test"
+name = "sdf"
 version = "0.1.0"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
 
 [dependencies]
-rayon = "1.0.2"
-glium = "0.22.0"
-sdf = { path = "./libs/sdf" }
-
+cgmath = "0.16.1"
+rusttype = "0.7.2"

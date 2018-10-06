@@ -1,14 +1,10 @@
 #[macro_use]
 extern crate glium;
-extern crate cgmath;
-extern crate image;
-extern crate rand;
 extern crate rayon;
-extern crate rusttype;
+extern crate sdf;
 
 pub mod font;
 pub mod renderer_thread;
-pub mod sdf;
 
 use font::*;
 use glium::{glutin, Surface};
