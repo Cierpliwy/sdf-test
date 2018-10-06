@@ -22,7 +22,8 @@ fn main() {
     let tex_size = std::env::args().nth(1).unwrap().parse::<u32>().unwrap();
     let font_size = std::env::args().nth(2).unwrap().parse::<u8>().unwrap();
     let shadow_size = std::env::args().nth(3).unwrap().parse::<u8>().unwrap();
-    let path = std::env::args().nth(4).unwrap();
+    let render_size = std::env::args().nth(4).unwrap().parse::<f32>().unwrap();
+    let path = std::env::args().nth(5).unwrap();
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());
@@ -53,18 +54,20 @@ z publikacją arkuszy Letrasetu, zawierających fragmenty
 Lorem Ipsum, a ostatnio z zawierającym różne wersje Lorem
 Ipsum oprogramowaniem przeznaczonym do realizacji druków
 na komputerach osobistych, jak Aldus PageMaker"##,
-        0.07,
+        render_size,
     );
 
-    let program = GLTextBlockLayoutProgram::new(&display).unwrap();
+    let mut program =
+        GLTextBlockLayoutProgram::new(&display, (res_x as u32, res_y as u32)).unwrap();
+
     let gl_layout = GLTextBlockLayout::new(&display, &layout).unwrap();
     let mut gl_texture_cache = GLFontTextureCache::new();
 
-    let draw = |gl_texture_cache: &GLFontTextureCache| {
+    let draw = |gl_texture_cache: &GLFontTextureCache, program: &GLTextBlockLayoutProgram| {
         let mut target = display.draw();
         target.clear_color(1.0, 1.0, 1.0, 1.0);
         gl_layout
-            .render(&mut target, gl_texture_cache, &program)
+            .render(&mut target, gl_texture_cache, program)
             .unwrap();
         target.finish().unwrap();
     };
@@ -86,7 +89,7 @@ na komputerach osobistych, jak Aldus PageMaker"##,
             .unwrap();
     }
 
-    draw(&mut gl_texture_cache);
+    draw(&mut gl_texture_cache, &program);
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
@@ -94,12 +97,13 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                 glutin::WindowEvent::CursorMoved { position, .. } => {
                     mouse_x = position.x as f32;
                     mouse_y = position.y as f32;
-                    draw(&mut gl_texture_cache);
+                    draw(&mut gl_texture_cache, &program);
                 }
                 glutin::WindowEvent::Resized(position) => {
                     res_x = position.width as f32;
                     res_y = position.height as f32;
-                    draw(&mut gl_texture_cache);
+                    program.set_res((res_x as u32, res_y as u32));
+                    draw(&mut gl_texture_cache, &program);
                 }
                 glutin::WindowEvent::ReceivedCharacter(_c) => {}
                 _ => (),
@@ -117,7 +121,7 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                         .update_texture(batch.texture_id, &texture, &display)
                         .unwrap();
                     println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
-                    draw(&mut gl_texture_cache);
+                    draw(&mut gl_texture_cache, &program);
                 }
             }
         }

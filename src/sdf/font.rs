@@ -32,6 +32,9 @@ pub struct GlyphLayout {
 }
 
 pub struct TextBlockLayout {
+    pub layout_size: f32,
+    pub font_size: u8,
+    pub shadow_size: u8,
     pub bounding_box: Rect<f32>,
     pub glyph_layouts: Vec<GlyphLayout>,
 }
@@ -238,6 +241,9 @@ impl Font {
         }
 
         TextBlockLayout {
+            layout_size: font_size,
+            font_size: self.font_size,
+            shadow_size: self.shadow_size,
             bounding_box: Rect::new(bb_min_x, bb_min_y, bb_max_x, bb_max_y),
             glyph_layouts,
         }

@@ -83,6 +83,7 @@ impl GLTextBlockLayoutVertex {
 }
 
 pub struct GLTextBlockLayout {
+    sharpness: f32,
     passes: HashMap<u32, GLTextBlockLayoutPass>,
 }
 
@@ -168,7 +169,12 @@ impl GLTextBlockLayout {
             );
         }
 
-        Ok(GLTextBlockLayout { passes: gl_passes })
+        Ok(GLTextBlockLayout {
+            passes: gl_passes,
+            sharpness: 0.33
+                / text_block_layout.shadow_size as f32
+                / (text_block_layout.layout_size / text_block_layout.font_size as f32),
+        })
     }
 
     pub fn render<S: ?Sized + Surface>(
@@ -183,7 +189,7 @@ impl GLTextBlockLayout {
                     &pass_data.vertex_buffer,
                     &pass_data.index_buffer,
                     &program.program,
-                    &uniform!{tex: texture},
+                    &uniform!{tex: texture, sharpness: self.sharpness, res: [program.res.0 as f32, program.res.1 as f32]},
                     &DrawParameters {
                         blend: Blend::alpha_blending(),
                         ..Default::default()
@@ -198,10 +204,14 @@ impl GLTextBlockLayout {
 
 pub struct GLTextBlockLayoutProgram {
     program: Program,
+    res: (u32, u32),
 }
 
 impl GLTextBlockLayoutProgram {
-    pub fn new<F: ?Sized + Facade>(facade: &F) -> Result<Self, ProgramChooserCreationError> {
+    pub fn new<F: ?Sized + Facade>(
+        facade: &F,
+        res: (u32, u32),
+    ) -> Result<Self, ProgramChooserCreationError> {
         let program = program!(facade, 140 => {
         vertex: r#"
             #version 140
@@ -211,8 +221,10 @@ impl GLTextBlockLayoutProgram {
 
             out vec2 vCoord;
 
+            uniform vec2 res;
+
             void main() {
-                gl_Position = vec4(pos, 0.0, 1.0);
+                gl_Position = vec4(pos / res * 2.0, 0.0, 1.0);
                 vCoord = coord;
             }
         "#,
@@ -223,6 +235,7 @@ impl GLTextBlockLayoutProgram {
             out vec4 color;
 
             uniform sampler2D tex;
+            uniform float sharpness;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -231,10 +244,15 @@ impl GLTextBlockLayoutProgram {
             void main() {
                 vec4 t = texture(tex, vCoord);
                 float d = median(t.r, t.g, t.b);
-                color = vec4(0.0, 0.0, 0.0, smoothstep(0.45, 0.55, d));
+                color = vec4(0.0, 0.0, 0.0, smoothstep(0.5 - sharpness, 0.5 + sharpness, d));
             }
         "#,
         })?;
-        Ok(Self { program })
+
+        Ok(Self { res, program })
+    }
+
+    pub fn set_res(&mut self, res: (u32, u32)) {
+        self.res = res;
     }
 }
