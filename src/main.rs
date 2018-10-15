@@ -26,11 +26,6 @@ fn main() {
     let context = glutin::ContextBuilder::new();
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    let mut mouse_x = 0.0;
-    let mut mouse_y = 0.0;
-    let mut res_x = 0.0;
-    let mut res_y = 0.0;
-
     let mut font_data = Vec::<u8>::new();
     std::fs::File::open(path)
         .unwrap()
@@ -50,20 +45,27 @@ z publikacją arkuszy Letrasetu, zawierających fragmenty
 Lorem Ipsum, a ostatnio z zawierającym różne wersje Lorem
 Ipsum oprogramowaniem przeznaczonym do realizacji druków
 na komputerach osobistych, jak Aldus PageMaker"##,
-        render_size,
     );
 
-    let mut program =
-        GLTextBlockLayoutProgram::new(&display, (res_x as u32, res_y as u32)).unwrap();
+    let mut config = GLTextBlockLayoutConfig {
+        font_size: render_size as f32,
+        font_sharpness: 0.5,
+        screen_width: tex_size,
+        screen_height: tex_size,
+        position_x: 0.0,
+        position_y: 0.0,
+    };
+    let mut scale = false;
 
+    let program = GLTextBlockLayoutProgram::new(&display).unwrap();
     let gl_layout = GLTextBlockLayout::new(&display, &layout).unwrap();
     let mut gl_texture_cache = GLFontTextureCache::new();
 
-    let draw = |gl_texture_cache: &GLFontTextureCache, program: &GLTextBlockLayoutProgram| {
+    let draw = |gl_texture_cache: &GLFontTextureCache, config: &GLTextBlockLayoutConfig| {
         let mut target = display.draw();
         target.clear_color(1.0, 1.0, 1.0, 1.0);
         gl_layout
-            .render(&mut target, gl_texture_cache, program)
+            .render(&mut target, gl_texture_cache, &program, config)
             .unwrap();
         target.finish().unwrap();
     };
@@ -85,23 +87,30 @@ na komputerach osobistych, jak Aldus PageMaker"##,
             .unwrap();
     }
 
-    draw(&mut gl_texture_cache, &program);
+    draw(&mut gl_texture_cache, &config);
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::CloseRequested => return glutin::ControlFlow::Break,
                 glutin::WindowEvent::CursorMoved { position, .. } => {
-                    mouse_x = position.x as f32;
-                    mouse_y = position.y as f32;
-                    draw(&mut gl_texture_cache, &program);
+                    if scale {
+                        config.font_size = position.y as f32 / config.screen_height as f32 * 500.0;
+                        config.font_sharpness = position.x as f32 / config.screen_width as f32;
+                    }
+                    config.position_x = position.x as f32;
+                    config.position_y = config.screen_height as f32 - position.y as f32;
+                    draw(&mut gl_texture_cache, &config);
                 }
                 glutin::WindowEvent::Resized(position) => {
-                    res_x = position.width as f32;
-                    res_y = position.height as f32;
-                    program.set_res((res_x as u32, res_y as u32));
-                    draw(&mut gl_texture_cache, &program);
+                    config.screen_width = position.width as u32;
+                    config.screen_height = position.height as u32;
+                    draw(&mut gl_texture_cache, &config);
                 }
-                glutin::WindowEvent::ReceivedCharacter(_c) => {}
+                glutin::WindowEvent::ReceivedCharacter(c) => {
+                    if c == 's' {
+                        scale = !scale;
+                    }
+                }
                 _ => (),
             },
             _ => (),
@@ -117,7 +126,7 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                         .update_texture(batch.texture_id, &texture, &display)
                         .unwrap();
                     println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
-                    draw(&mut gl_texture_cache, &program);
+                    draw(&mut gl_texture_cache, &config);
                 }
             }
         }

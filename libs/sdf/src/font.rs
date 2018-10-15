@@ -32,7 +32,6 @@ pub struct GlyphLayout {
 }
 
 pub struct TextBlockLayout {
-    pub layout_size: f32,
     pub font_size: u8,
     pub shadow_size: u8,
     pub bounding_box: Rect<f32>,
@@ -176,7 +175,7 @@ impl Font {
         batches
     }
 
-    pub fn layout_text_block(&mut self, text: &str, font_size: f32) -> TextBlockLayout {
+    pub fn layout_text_block(&mut self, text: &str) -> TextBlockLayout {
         self.allocate_glyphs(text);
 
         let mut glyph_layouts = Vec::new();
@@ -186,8 +185,8 @@ impl Font {
         let mut bb_max_x = 0.0;
         let mut bb_max_y = 0.0;
 
-        let shadow = self.shadow_size as f32 / self.font_size as f32 * font_size;
-        let scale = Scale::uniform(font_size);
+        let shadow = self.shadow_size as f32 / self.font_size as f32;
+        let scale = Scale::uniform(1.0);
         let v_metrics = self.font.v_metrics(scale);
 
         let mut last_glyph = None;
@@ -241,7 +240,6 @@ impl Font {
         }
 
         TextBlockLayout {
-            layout_size: font_size,
             font_size: self.font_size,
             shadow_size: self.shadow_size,
             bounding_box: Rect::new(bb_min_x, bb_min_y, bb_max_x, bb_max_y),

@@ -83,7 +83,8 @@ impl GLTextBlockLayoutVertex {
 }
 
 pub struct GLTextBlockLayout {
-    sharpness: f32,
+    shadow_size: u8,
+    font_size: u8,
     passes: HashMap<u32, GLTextBlockLayoutPass>,
 }
 
@@ -171,9 +172,8 @@ impl GLTextBlockLayout {
 
         Ok(GLTextBlockLayout {
             passes: gl_passes,
-            sharpness: 0.33
-                / text_block_layout.shadow_size as f32
-                / (text_block_layout.layout_size / text_block_layout.font_size as f32),
+            shadow_size: text_block_layout.shadow_size,
+            font_size: text_block_layout.font_size,
         })
     }
 
@@ -182,16 +182,28 @@ impl GLTextBlockLayout {
         surface: &mut S,
         texture_cache: &GLFontTextureCache,
         program: &GLTextBlockLayoutProgram,
+        config: &GLTextBlockLayoutConfig,
     ) -> Result<(), DrawError> {
+        let sharpness = config.font_sharpness
+            / self.shadow_size as f32
+            / (config.font_size / self.font_size as f32);
+
         for (texture_id, pass_data) in &self.passes {
             if let Some(texture) = texture_cache.get_texture(*texture_id) {
                 surface.draw(
                     &pass_data.vertex_buffer,
                     &pass_data.index_buffer,
                     &program.program,
-                    &uniform!{tex: texture, sharpness: self.sharpness, res: [program.res.0 as f32, program.res.1 as f32]},
+                    &uniform!{
+                        uTexture: texture,
+                        uSharpness: sharpness,
+                        uFontSize: config.font_size,
+                        uPosition: [config.position_x, config.position_y],
+                        uScreen: [config.screen_width as f32, config.screen_height as f32]
+                    },
                     &DrawParameters {
                         blend: Blend::alpha_blending(),
+                        color_mask: (true, true, true, false),
                         ..Default::default()
                     },
                 )?;
@@ -202,16 +214,21 @@ impl GLTextBlockLayout {
     }
 }
 
+pub struct GLTextBlockLayoutConfig {
+    pub font_size: f32,
+    pub font_sharpness: f32,
+    pub screen_width: u32,
+    pub screen_height: u32,
+    pub position_x: f32,
+    pub position_y: f32,
+}
+
 pub struct GLTextBlockLayoutProgram {
     program: Program,
-    res: (u32, u32),
 }
 
 impl GLTextBlockLayoutProgram {
-    pub fn new<F: ?Sized + Facade>(
-        facade: &F,
-        res: (u32, u32),
-    ) -> Result<Self, ProgramChooserCreationError> {
+    pub fn new<F: ?Sized + Facade>(facade: &F) -> Result<Self, ProgramChooserCreationError> {
         let program = program!(facade, 140 => {
         vertex: r#"
             #version 140
@@ -221,10 +238,12 @@ impl GLTextBlockLayoutProgram {
 
             out vec2 vCoord;
 
-            uniform vec2 res;
+            uniform float uFontSize;
+            uniform vec2 uScreen;
+            uniform vec2 uPosition;
 
             void main() {
-                gl_Position = vec4(pos / res * 2.0, 0.0, 1.0);
+                gl_Position = vec4(uPosition / uScreen * 2.0 - 1.0 + pos * uFontSize / uScreen, 0.0, 1.0);
                 vCoord = coord;
             }
         "#,
@@ -234,25 +253,21 @@ impl GLTextBlockLayoutProgram {
             in vec2 vCoord;
             out vec4 color;
 
-            uniform sampler2D tex;
-            uniform float sharpness;
+            uniform sampler2D uTexture;
+            uniform float uSharpness;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
             }
 
             void main() {
-                vec4 t = texture(tex, vCoord);
+                vec4 t = texture(uTexture, vCoord);
                 float d = median(t.r, t.g, t.b);
-                color = vec4(0.0, 0.0, 0.0, smoothstep(0.5 - sharpness, 0.5 + sharpness, d));
+                color = vec4(0.0, 0.0, 0.0, smoothstep(0.5 - uSharpness, 0.5 + uSharpness, d));
             }
         "#,
         })?;
 
-        Ok(Self { res, program })
-    }
-
-    pub fn set_res(&mut self, res: (u32, u32)) {
-        self.res = res;
+        Ok(Self { program })
     }
 }
