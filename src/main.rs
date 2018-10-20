@@ -3,9 +3,11 @@ extern crate glium;
 extern crate rayon;
 extern crate sdf;
 
+pub mod block;
 pub mod font;
 pub mod renderer_thread;
 
+use block::*;
 use font::*;
 use glium::{glutin, Surface};
 use renderer_thread::{renderer_entry_point, RendererCommand, RendererContext, RendererResult};
@@ -25,6 +27,23 @@ fn main() {
     let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());
     let context = glutin::ContextBuilder::new();
     let display = glium::Display::new(window, context, &events_loop).unwrap();
+
+    let mut block_config = GLBlockConfig {
+        alpha: 0.8,
+        sharpness: 5.0,
+        radius: 50.0,
+        screen: [tex_size as f32, tex_size as f32],
+        position: [0.0, 0.0],
+        size: [400.0, 100.0],
+        left_offset: -10.0,
+        left_color: [1.0, 0.7, 8.0],
+        right_offset: 450.0,
+        right_color: [6.0, 1.0, 9.0],
+        inner_shadow: 60.0,
+        shade_color: [0.0, 0.0, 0.0],
+    };
+    let block_program = GLBlockProgram::new(&display).expect("Creating block");
+    let block = GLBlock::new(&display).expect("Creating block");
 
     let mut font_data = Vec::<u8>::new();
     std::fs::File::open(path)
@@ -61,12 +80,20 @@ na komputerach osobistych, jak Aldus PageMaker"##,
     let gl_layout = GLTextBlockLayout::new(&display, &layout).unwrap();
     let mut gl_texture_cache = GLFontTextureCache::new();
 
-    let draw = |gl_texture_cache: &GLFontTextureCache, config: &GLTextBlockLayoutConfig| {
+    let draw = |gl_texture_cache: &GLFontTextureCache,
+                config: &GLTextBlockLayoutConfig,
+                block_config: &GLBlockConfig| {
         let mut target = display.draw();
         target.clear_color(1.0, 1.0, 1.0, 1.0);
+
         gl_layout
             .render(&mut target, gl_texture_cache, &program, config)
             .unwrap();
+
+        block
+            .render(&mut target, &block_program, block_config)
+            .unwrap();
+
         target.finish().unwrap();
     };
 
@@ -87,7 +114,7 @@ na komputerach osobistych, jak Aldus PageMaker"##,
             .unwrap();
     }
 
-    draw(&mut gl_texture_cache, &config);
+    draw(&mut gl_texture_cache, &config, &block_config);
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
@@ -96,15 +123,27 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                     if scale {
                         config.font_size = position.y as f32 / config.screen_height as f32 * 500.0;
                         config.font_sharpness = position.x as f32 / config.screen_width as f32;
+                        block_config.radius = position.x as f32 / 10.0;
+                        block_config.sharpness = position.y as f32 / 10.0;
                     }
-                    config.position_x = position.x as f32;
-                    config.position_y = config.screen_height as f32 - position.y as f32;
-                    draw(&mut gl_texture_cache, &config);
+
+                    let pos = [
+                        position.x as f32,
+                        config.screen_height as f32 - position.y as f32,
+                    ];
+
+                    config.position_x = pos[0];
+                    config.position_y = pos[1];
+                    block_config.position = pos;
+
+                    draw(&mut gl_texture_cache, &config, &block_config);
                 }
                 glutin::WindowEvent::Resized(position) => {
-                    config.screen_width = position.width as u32;
-                    config.screen_height = position.height as u32;
-                    draw(&mut gl_texture_cache, &config);
+                    let res = [position.width as f32, position.height as f32];
+                    config.screen_width = res[0] as u32;
+                    config.screen_height = res[1] as u32;
+                    block_config.screen = res;
+                    draw(&mut gl_texture_cache, &config, &block_config);
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {
                     if c == 's' {
@@ -126,7 +165,7 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                         .update_texture(batch.texture_id, &texture, &display)
                         .unwrap();
                     println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
-                    draw(&mut gl_texture_cache, &config);
+                    draw(&mut gl_texture_cache, &config, &block_config);
                 }
             }
         }
