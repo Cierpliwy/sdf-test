@@ -24,13 +24,15 @@ fn main() {
     let path = std::env::args().nth(5).unwrap();
 
     let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new().with_dimensions((tex_size, tex_size).into());
-    let context = glutin::ContextBuilder::new();
+    let window = glutin::WindowBuilder::new()
+        .with_dimensions((tex_size, tex_size).into())
+        .with_title("Multi-channel signed distance font demo - by Cierpliwy");
+    let context = glutin::ContextBuilder::new().with_vsync(true);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
     let mut block_config = GLBlockConfig {
-        alpha: 0.8,
-        sharpness: 5.0,
+        alpha: 0.95,
+        sharpness: 1.0,
         radius: 50.0,
         screen: [tex_size as f32, tex_size as f32],
         position: [0.0, 0.0],
@@ -74,28 +76,10 @@ na komputerach osobistych, jak Aldus PageMaker"##,
         position_x: 0.0,
         position_y: 0.0,
     };
-    let mut scale = false;
 
     let program = GLTextBlockLayoutProgram::new(&display).unwrap();
     let gl_layout = GLTextBlockLayout::new(&display, &layout).unwrap();
     let mut gl_texture_cache = GLFontTextureCache::new();
-
-    let draw = |gl_texture_cache: &GLFontTextureCache,
-                config: &GLTextBlockLayoutConfig,
-                block_config: &GLBlockConfig| {
-        let mut target = display.draw();
-        target.clear_color(1.0, 1.0, 1.0, 1.0);
-
-        gl_layout
-            .render(&mut target, gl_texture_cache, &program, config)
-            .unwrap();
-
-        block
-            .render(&mut target, &block_program, block_config)
-            .unwrap();
-
-        target.finish().unwrap();
-    };
 
     let (renderer_command_sender, renderer_command_receiver) = channel();
     let (renderer_result_sender, renderer_result_receiver) = channel();
@@ -108,23 +92,42 @@ na komputerach osobistych, jak Aldus PageMaker"##,
         renderer_entry_point(renderer_context).expect("Got an error on renderer thread");
     });
 
-    for batch in font.get_texture_render_batches() {
-        renderer_command_sender
-            .send(RendererCommand::RenderShapes(batch))
-            .unwrap();
-    }
+    let mut exit = false;
+    let mut scale = false;
 
-    draw(&mut gl_texture_cache, &config, &block_config);
-    events_loop.run_forever(|event| {
-        match event {
+    while !exit {
+        // Draw scene
+        let mut target = display.draw();
+        target.clear_color(1.0, 1.0, 1.0, 1.0);
+
+        gl_layout
+            .render(&mut target, &gl_texture_cache, &program, &config)
+            .unwrap();
+
+        block
+            .render(&mut target, &block_program, &block_config)
+            .unwrap();
+
+        // Vsync
+        target.finish().unwrap();
+
+        // Send fonts to renderer thread
+        for batch in font.get_texture_render_batches() {
+            renderer_command_sender
+                .send(RendererCommand::RenderShapes(batch))
+                .unwrap();
+        }
+
+        // Handle window events
+        events_loop.poll_events(|event| match event {
             glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::CloseRequested => return glutin::ControlFlow::Break,
+                glutin::WindowEvent::CloseRequested => exit = true,
                 glutin::WindowEvent::CursorMoved { position, .. } => {
                     if scale {
                         config.font_size = position.y as f32 / config.screen_height as f32 * 500.0;
                         config.font_sharpness = position.x as f32 / config.screen_width as f32;
                         block_config.radius = position.x as f32 / 10.0;
-                        block_config.sharpness = position.y as f32 / 10.0;
+                        block_config.inner_shadow = position.y as f32 / 10.0;
                     }
 
                     let pos = [
@@ -135,15 +138,12 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                     config.position_x = pos[0];
                     config.position_y = pos[1];
                     block_config.position = pos;
-
-                    draw(&mut gl_texture_cache, &config, &block_config);
                 }
                 glutin::WindowEvent::Resized(position) => {
                     let res = [position.width as f32, position.height as f32];
                     config.screen_width = res[0] as u32;
                     config.screen_height = res[1] as u32;
                     block_config.screen = res;
-                    draw(&mut gl_texture_cache, &config, &block_config);
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {
                     if c == 's' {
@@ -152,26 +152,24 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                 }
                 _ => (),
             },
-            _ => (),
-        }
-
-        let result = renderer_result_receiver.try_recv();
-        if let Ok(result) = result {
-            match result {
-                RendererResult::ShapesRendered(batch) => {
-                    let texture = batch.texture.lock().unwrap();
-                    let texture_upload_time = Instant::now();
-                    gl_texture_cache
-                        .update_texture(batch.texture_id, &texture, &display)
-                        .unwrap();
-                    println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
-                    draw(&mut gl_texture_cache, &config, &block_config);
+            glutin::Event::Awakened => {
+                let result = renderer_result_receiver.try_recv();
+                if let Ok(result) = result {
+                    match result {
+                        RendererResult::ShapesRendered(batch) => {
+                            let texture = batch.texture.lock().unwrap();
+                            let texture_upload_time = Instant::now();
+                            gl_texture_cache
+                                .update_texture(batch.texture_id, &texture, &display)
+                                .unwrap();
+                            println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
+                        }
+                    }
                 }
             }
-        }
-
-        glutin::ControlFlow::Continue
-    });
+            _ => (),
+        });
+    }
 
     renderer_command_sender
         .send(RendererCommand::Exit)
