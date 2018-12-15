@@ -1,42 +1,47 @@
-pub mod block;
 pub mod font;
 pub mod renderer_thread;
 pub mod text;
 
-use crate::block::*;
+pub mod ui;
+
 use crate::font::*;
 use crate::renderer_thread::{
     renderer_entry_point, RendererCommand, RendererContext, RendererResult,
 };
 use crate::text::*;
+use crate::ui::block::*;
+use crate::ui::*;
 
 use glium::{glutin, Surface};
+use std::cell::Cell;
 use std::io::prelude::*;
+use std::rc::Rc;
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Instant;
 
 fn main() {
-    let tex_size = std::env::args().nth(1).unwrap().parse::<u32>().unwrap();
-    let font_size = std::env::args().nth(2).unwrap().parse::<u8>().unwrap();
-    let shadow_size = std::env::args().nth(3).unwrap().parse::<u8>().unwrap();
-    let render_size = std::env::args().nth(4).unwrap().parse::<f32>().unwrap();
-    let path = std::env::args().nth(5).unwrap();
+    let tex_size = 1024;
+    let font_size = 64;
+    let shadow_size = 8;
+    let render_size = 64;
+    let path = std::env::args().nth(1).unwrap();
 
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
-        .with_dimensions((tex_size, tex_size).into())
+        .with_dimensions((800, 600).into())
         .with_title("Multi-channel signed distance font demo - by Cierpliwy");
     let context = glutin::ContextBuilder::new().with_vsync(true);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    let mut block_config = GLBlockConfig {
+    let screen: UIScreen = Rc::new(Cell::new(UIScreenInfo::new([800.0, 600.0], 1.0)));
+
+    let ui_ctx = UIContext::new(&display);
+    let block_ctx = Rc::new(UIBlockContext::new(ui_ctx).expect("Creating UI Block Context failed"));
+    let block_style = UIBlockStyle {
         alpha: 0.95,
         sharpness: 1.0,
         radius: 50.0,
-        screen: [tex_size as f32, tex_size as f32],
-        position: [0.0, 0.0],
-        size: [400.0, 100.0],
         left_offset: -10.0,
         left_color: [1.0, 0.7, 8.0],
         right_offset: 450.0,
@@ -44,8 +49,12 @@ fn main() {
         inner_shadow: 60.0,
         shade_color: [0.0, 0.0, 0.0],
     };
-    let block_program = GLBlockProgram::new(&display).expect("Creating block");
-    let block = GLBlock::new(&display).expect("Creating block");
+
+    let block_layout = UIAbsoluteLayout::new(&screen, [100.0, 100.0], [300.0, 50.0]);
+    let block = UIBlock::new(block_ctx.clone());
+
+    let block_layout2 = UIRelativeLayout::new(&screen, [0.1, 0.2], [0.5, 0.8]);
+    let block2 = UIBlock::new(block_ctx.clone());
 
     let mut font_data = Vec::<u8>::new();
     std::fs::File::open(path)
@@ -108,7 +117,11 @@ na komputerach osobistych, jak Aldus PageMaker"##,
             .unwrap();
 
         block
-            .render(&mut target, &block_program, &block_config)
+            .render(&mut target, &block_style, &block_layout)
+            .unwrap();
+
+        block2
+            .render(&mut target, &block_style, &block_layout2)
             .unwrap();
 
         // Vsync
@@ -129,8 +142,6 @@ na komputerach osobistych, jak Aldus PageMaker"##,
                     if scale {
                         config.font_size = position.y as f32 / config.screen_height as f32 * 500.0;
                         config.font_sharpness = position.x as f32 / config.screen_width as f32;
-                        block_config.radius = position.x as f32 / 10.0;
-                        block_config.inner_shadow = position.y as f32 / 10.0;
                     }
 
                     let pos = [
@@ -140,13 +151,15 @@ na komputerach osobistych, jak Aldus PageMaker"##,
 
                     config.position_x = pos[0];
                     config.position_y = pos[1];
-                    block_config.position = pos;
                 }
                 glutin::WindowEvent::Resized(position) => {
                     let res = [position.width as f32, position.height as f32];
                     config.screen_width = res[0] as u32;
                     config.screen_height = res[1] as u32;
-                    block_config.screen = res;
+                    screen.set(UIScreenInfo::new(
+                        [res[0], res[1]],
+                        screen.get().get_ratio(),
+                    ))
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {
                     if c == 's' {
