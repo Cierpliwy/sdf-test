@@ -4,8 +4,12 @@ use glium::index::{BufferCreationError as IndexBufferCreationError, PrimitiveTyp
 use glium::program::ProgramChooserCreationError;
 use glium::texture::{ClientFormat, MipmapsOption, RawImage2d, Texture2d, TextureCreationError};
 use glium::vertex::BufferCreationError as VertexBufferCreationError;
-use glium::{Blend, DrawError, IndexBuffer, Program, Rect, Surface, VertexBuffer};
+use glium::{
+    implement_vertex, program, uniform, Blend, DrawError, IndexBuffer, Program, Rect as GLRect,
+    Surface, VertexBuffer,
+};
 use sdf::font::{GlyphLayout, TextBlockLayout};
+use sdf::geometry::Rect;
 use sdf::texture::Texture;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -36,7 +40,7 @@ impl GLFontTextureCache {
 
         let new_texture = if let Some(current_texture) = self.textures.get_mut(&id) {
             current_texture.write(
-                Rect {
+                GLRect {
                     left: 0,
                     bottom: 0,
                     width: texture.get_width(),
@@ -85,6 +89,7 @@ impl GLTextBlockLayoutVertex {
 pub struct GLTextBlockLayout {
     shadow_size: u8,
     font_size: u8,
+    bounding_box: Rect<f32>,
     passes: HashMap<u32, GLTextBlockLayoutPass>,
 }
 
@@ -174,6 +179,7 @@ impl GLTextBlockLayout {
             passes: gl_passes,
             shadow_size: text_block_layout.shadow_size,
             font_size: text_block_layout.font_size,
+            bounding_box: text_block_layout.bounding_box,
         })
     }
 
@@ -194,7 +200,7 @@ impl GLTextBlockLayout {
                     &pass_data.vertex_buffer,
                     &pass_data.index_buffer,
                     &program.program,
-                    &uniform!{
+                    &uniform! {
                         uTexture: texture,
                         uSharpness: sharpness,
                         uFontSize: config.font_size,

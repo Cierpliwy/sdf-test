@@ -3,7 +3,10 @@ use glium::draw_parameters::DrawParameters;
 use glium::index::{BufferCreationError as IndexBufferCreationError, PrimitiveType};
 use glium::program::ProgramChooserCreationError;
 use glium::vertex::BufferCreationError as VertexBufferCreationError;
-use glium::{Blend, DrawError, IndexBuffer, Program, Surface, VertexBuffer};
+use glium::{
+    implement_vertex, program, uniform, Blend, DrawError, IndexBuffer, Program, Surface,
+    VertexBuffer,
+};
 
 pub struct GLBlockConfig {
     pub alpha: f32,
@@ -155,7 +158,7 @@ impl GLBlock {
             &self.vertex_buffer,
             &self.index_buffer,
             &program.program,
-            &uniform!{
+            &uniform! {
                 uAlpha: config.alpha,
                 uRadius: config.radius.min(limit),
                 uSharpness: config.sharpness.min(limit),

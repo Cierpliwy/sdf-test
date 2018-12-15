@@ -1,16 +1,16 @@
-#[macro_use]
-extern crate glium;
-extern crate rayon;
-extern crate sdf;
-
 pub mod block;
 pub mod font;
 pub mod renderer_thread;
+pub mod text;
 
-use block::*;
-use font::*;
+use crate::block::*;
+use crate::font::*;
+use crate::renderer_thread::{
+    renderer_entry_point, RendererCommand, RendererContext, RendererResult,
+};
+use crate::text::*;
+
 use glium::{glutin, Surface};
-use renderer_thread::{renderer_entry_point, RendererCommand, RendererContext, RendererResult};
 use std::io::prelude::*;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -67,6 +67,9 @@ Lorem Ipsum, a ostatnio z zawierającym różne wersje Lorem
 Ipsum oprogramowaniem przeznaczonym do realizacji druków
 na komputerach osobistych, jak Aldus PageMaker"##,
     );
+
+    let mut text = GLText::new(30.0, &display);
+    text.set_text("   Hello there this is\na\n    something new.", &mut font);
 
     let mut config = GLTextBlockLayoutConfig {
         font_size: render_size as f32,

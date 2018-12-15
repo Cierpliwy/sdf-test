@@ -2,7 +2,8 @@
 name = "sdf"
 version = "0.1.0"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 cgmath = "0.16.1"
-rusttype = "0.7.2"
+rusttype = "0.7.3"

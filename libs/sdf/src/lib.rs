@@ -5,7 +5,7 @@ It allows you to create multi channel signed distance fields rendered
 to the memory. Currently rendering from fonts is supported as well.
 */
 
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 
 extern crate cgmath;
 extern crate rusttype;
