@@ -45,6 +45,14 @@ pub trait UILayout {
     fn get_screen(&self) -> UIScreen;
     fn get_pos(&self) -> [f32; 2];
     fn get_size(&self) -> [f32; 2];
+    fn is_inside(&self, point: [f32; 2]) -> bool {
+        let pos = self.get_pos();
+        let size = self.get_size();
+        point[0] >= pos[0]
+            && point[0] <= pos[0] + size[0]
+            && point[1] >= pos[1]
+            && point[1] <= pos[1] + size[1]
+    }
 }
 
 impl UILayout for UIScreen {
@@ -112,11 +120,57 @@ impl UILayout for UIRelativeLayout<'_> {
 
     fn get_pos(&self) -> [f32; 2] {
         let size = self.parent.get_size();
-        [size[0] * self.pos[0], size[1] * self.pos[1]]
+        let pos = self.parent.get_pos();
+        [
+            pos[0] + size[0] * self.pos[0],
+            pos[1] + size[1] * self.pos[1],
+        ]
     }
 
     fn get_size(&self) -> [f32; 2] {
         let size = self.parent.get_size();
         [size[0] * self.size[0], size[1] * self.size[1]]
+    }
+}
+
+// ============ Scale Layout =========================================================
+
+pub struct UIScaleLayout<'a> {
+    parent: &'a UILayout,
+    scale: [f32; 2],
+    anchor: [f32; 2],
+}
+
+impl<'a> UIScaleLayout<'a> {
+    pub fn new(parent: &'a UILayout, scale: [f32; 2], anchor: [f32; 2]) -> Self {
+        Self {
+            parent,
+            scale,
+            anchor,
+        }
+    }
+}
+
+impl UILayout for UIScaleLayout<'_> {
+    fn get_screen(&self) -> Rc<Cell<UIScreenInfo>> {
+        self.parent.get_screen()
+    }
+
+    fn get_pos(&self) -> [f32; 2] {
+        let size = self.parent.get_size();
+        let pos = self.parent.get_pos();
+        let origin = [
+            self.anchor[0] * size[0] + pos[0],
+            self.anchor[1] * size[1] + pos[1],
+        ];
+        [
+            (pos[0] - origin[0]) * self.scale[0] + origin[0],
+            (pos[1] - origin[1]) * self.scale[1] + origin[1],
+        ]
+    }
+
+    fn get_size(&self) -> [f32; 2] {
+        let size = self.parent.get_size();
+        [size[0] * self.scale[0], size[1] * self.scale[1]]
     }
 }

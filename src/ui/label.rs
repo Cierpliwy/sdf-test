@@ -51,6 +51,8 @@ impl UILabelContext {
 
             uniform sampler2D uTexture;
             uniform float uSharpness;
+            uniform vec4 uColor;
+            uniform vec4 uShadowColor;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -59,7 +61,9 @@ impl UILabelContext {
             void main() {
                 vec4 t = texture(uTexture, vCoord);
                 float d = median(t.r, t.g, t.b);
-                color = vec4(0.0, 0.0, 0.0, smoothstep(0.4 - uSharpness, 0.4 + uSharpness, d));
+                float alpha = smoothstep(0.6, 0.3, d);
+                color = mix(uColor, uShadowColor, alpha);
+                color.a = color.a * smoothstep(0.45 - uSharpness, 0.45 + uSharpness, d);
             }
         "#,
         })
@@ -155,6 +159,8 @@ pub struct UILabel {
     bounding_box: Rect<f32>,
     passes: HashMap<u32, UILabelRenderPass>,
     context: Rc<RefCell<UILabelContext>>,
+    color: [f32; 4],
+    shadow_color: [f32; 4],
 }
 
 impl UILabel {
@@ -163,6 +169,8 @@ impl UILabel {
         text: &str,
         size: f32,
         align: UILabelAlignment,
+        color: [f32; 4],
+        shadow_color: [f32; 4],
     ) -> Self {
         let mut label = Self {
             align,
@@ -171,6 +179,8 @@ impl UILabel {
             text: String::new(),
             bounding_box: Rect::new(0.0, 0.0, 0.0, 0.0),
             passes: HashMap::new(),
+            color,
+            shadow_color,
         };
 
         label.set_text(text);
@@ -186,6 +196,14 @@ impl UILabel {
             bb.max.x * size,
             bb.max.y * size,
         )
+    }
+
+    pub fn set_color(&mut self, color: [f32; 4]) {
+        self.color = color;
+    }
+
+    pub fn set_shadow_color(&mut self, shadow_color: [f32; 4]) {
+        self.shadow_color = shadow_color;
     }
 
     pub fn set_size(&mut self, size: f32) {
@@ -298,7 +316,9 @@ impl UILabel {
                             uSharpness: sharpness,
                             uFontSize: self.size,
                             uPosition: pos,
-                            uScreen: screen.get_size()
+                            uScreen: screen.get_size(),
+                            uColor: self.color,
+                            uShadowColor: self.shadow_color
                         },
                         &DrawParameters {
                             blend: Blend::alpha_blending(),
