@@ -1,44 +1,11 @@
 use super::{UIContext, UILayout};
 
 use glium::draw_parameters::DrawParameters;
-use glium::index::{BufferCreationError as IndexBufferCreationError, PrimitiveType};
-use glium::program::ProgramChooserCreationError;
-use glium::vertex::BufferCreationError as VertexBufferCreationError;
+use glium::index::PrimitiveType;
 use glium::{
-    implement_vertex, program, uniform, Blend, DrawError, IndexBuffer, Program, Surface,
-    VertexBuffer,
+    implement_vertex, program, uniform, Blend, IndexBuffer, Program, Surface, VertexBuffer,
 };
-
 use std::rc::Rc;
-
-// ======== ERROR =======================================================================
-
-#[derive(Debug)]
-pub enum UIBlockError {
-    IndexBufferCreationError(IndexBufferCreationError),
-    VertexBufferCreationError(VertexBufferCreationError),
-    ProgramChooserCreationError(ProgramChooserCreationError),
-}
-
-impl From<IndexBufferCreationError> for UIBlockError {
-    fn from(error: IndexBufferCreationError) -> Self {
-        UIBlockError::IndexBufferCreationError(error)
-    }
-}
-
-impl From<VertexBufferCreationError> for UIBlockError {
-    fn from(error: VertexBufferCreationError) -> Self {
-        UIBlockError::VertexBufferCreationError(error)
-    }
-}
-
-impl From<ProgramChooserCreationError> for UIBlockError {
-    fn from(error: ProgramChooserCreationError) -> Self {
-        UIBlockError::ProgramChooserCreationError(error)
-    }
-}
-
-// ======== CONTEXT (read only data for every block ) ===================================
 
 #[derive(Copy, Clone)]
 struct UIBlockVertex {
@@ -61,7 +28,7 @@ pub struct UIBlockContext {
 }
 
 impl UIBlockContext {
-    pub fn new(ui_context: UIContext) -> Result<Self, UIBlockError> {
+    pub fn new(ui_context: UIContext) -> Self {
         let gl_context = &ui_context.gl_context;
 
         let program = program!(gl_context, 140 => {
@@ -118,7 +85,7 @@ impl UIBlockContext {
                 color = vec4(c, area * uAlpha);
             }
         "#,
-        })?;
+        }).expect("Cannot create program for UIBlock");
 
         let vertex_buffer = VertexBuffer::immutable(
             gl_context,
@@ -128,24 +95,24 @@ impl UIBlockContext {
                 UIBlockVertex::new(1.0, 1.0),
                 UIBlockVertex::new(1.0, 0.0),
             ],
-        )?;
+        )
+        .expect("Cannot create vertex buffer for UIBlock");
 
         let index_buffer = IndexBuffer::immutable(
             gl_context,
             PrimitiveType::TrianglesList,
             &[0, 1, 2, 0, 2, 3],
-        )?;
+        )
+        .expect("Cannot create index buffer for UIBlock");
 
-        Ok(Self {
+        Self {
             ui_context,
             program,
             vertex_buffer,
             index_buffer,
-        })
+        }
     }
 }
-
-// ======== STYLE =======================================================================
 
 pub struct UIBlockStyle {
     pub alpha: f32,
@@ -158,8 +125,6 @@ pub struct UIBlockStyle {
     pub inner_shadow: f32,
     pub shade_color: [f32; 3],
 }
-
-// ======== BLOCK IMPL ==================================================================
 
 #[derive(Clone)]
 pub struct UIBlock {
@@ -176,36 +141,37 @@ impl UIBlock {
         surface: &mut S,
         style: &UIBlockStyle,
         layout: &UILayout,
-    ) -> Result<(), DrawError> {
+    ) {
         let size = layout.get_size();
         let pos = layout.get_pos();
         let screen = layout.get_screen().get().size;
         let limit = size[0].min(size[1]) / 2.0;
 
-        surface.draw(
-            &self.context.vertex_buffer,
-            &self.context.index_buffer,
-            &self.context.program,
-            &uniform! {
-                uAlpha: style.alpha,
-                uRadius: style.radius.min(limit),
-                uSharpness: style.sharpness.min(limit),
-                uSize: size,
-                uScreen: screen,
-                uPosition: pos,
-                uLeftOffset: style.left_offset,
-                uLeftColor: style.left_color,
-                uRightOffset: style.right_offset,
-                uRightColor: style.right_color,
-                uInnerShadow: style.inner_shadow,
-                uShadeColor: style.shade_color,
-            },
-            &DrawParameters {
-                blend: Blend::alpha_blending(),
-                color_mask: (true, true, true, false),
-                ..Default::default()
-            },
-        )?;
-        Ok(())
+        surface
+            .draw(
+                &self.context.vertex_buffer,
+                &self.context.index_buffer,
+                &self.context.program,
+                &uniform! {
+                    uAlpha: style.alpha,
+                    uRadius: style.radius.min(limit),
+                    uSharpness: style.sharpness.min(limit),
+                    uSize: size,
+                    uScreen: screen,
+                    uPosition: pos,
+                    uLeftOffset: style.left_offset,
+                    uLeftColor: style.left_color,
+                    uRightOffset: style.right_offset,
+                    uRightColor: style.right_color,
+                    uInnerShadow: style.inner_shadow,
+                    uShadeColor: style.shade_color,
+                },
+                &DrawParameters {
+                    blend: Blend::alpha_blending(),
+                    color_mask: (true, true, true, false),
+                    ..Default::default()
+                },
+            )
+            .expect("Cannot draw UIBlock");
     }
 }

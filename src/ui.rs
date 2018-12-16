@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 pub mod block;
 pub mod button;
+pub mod label;
 
 #[derive(Clone)]
 pub struct UIContext {
@@ -31,6 +32,10 @@ impl UIScreenInfo {
 
     pub fn get_ratio(&self) -> f32 {
         self.ratio
+    }
+
+    pub fn get_size(&self) -> [f32; 2] {
+        self.size
     }
 }
 

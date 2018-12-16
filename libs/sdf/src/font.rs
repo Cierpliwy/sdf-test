@@ -157,6 +157,14 @@ impl Font {
         self.texture_metadatas[texture_id as usize].texture.clone()
     }
 
+    pub fn get_shadow_size(&self) -> u8 {
+        self.shadow_size
+    }
+
+    pub fn get_font_size(&self) -> u8 {
+        self.font_size
+    }
+
     pub fn get_texture_render_batches(&mut self) -> Vec<TextureRenderBatch> {
         let mut batches = Vec::new();
 
@@ -253,7 +261,8 @@ impl<'a> From<&'a [Contour]> for Shape {
         let segments = contours.iter().flat_map(|contour| {
             once(Segment::Start {
                 count: contour.segments.len(),
-            }).chain(contour.segments.iter().map(|segment| match segment {
+            })
+            .chain(contour.segments.iter().map(|segment| match segment {
                 FontSegment::Line(line) => Segment::Line {
                     line: Line {
                         p0: Point2::new(line.p[0].x, line.p[0].y),

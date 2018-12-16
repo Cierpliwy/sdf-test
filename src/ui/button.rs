@@ -1,9 +1,7 @@
 use crate::ui::block::{UIBlock, UIBlockContext, UIBlockStyle};
 use crate::ui::UILayout;
-use glium::{DrawError, Surface};
+use glium::Surface;
 use std::rc::Rc;
-
-// ======== CONTEXT (read only data for every block ) ===================================
 
 pub struct UIButtonContext {
     block_context: Rc<UIBlockContext>,
@@ -14,8 +12,6 @@ impl UIButtonContext {
         Self { block_context }
     }
 }
-
-// ======== BUTTON IMPL =================================================================
 
 pub struct UIButton {
     context: Rc<UIButtonContext>,
@@ -45,12 +41,7 @@ impl UIButton {
         }
     }
 
-    pub fn render<S: ?Sized + Surface>(
-        &self,
-        surface: &mut S,
-        layout: &UILayout,
-    ) -> Result<(), DrawError> {
-        self.block.render(surface, &self.style, layout)?;
-        Ok(())
+    pub fn render<S: ?Sized + Surface>(&self, surface: &mut S, layout: &UILayout) {
+        self.block.render(surface, &self.style, layout);
     }
 }
