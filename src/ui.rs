@@ -5,6 +5,7 @@ use std::rc::Rc;
 pub mod block;
 pub mod button;
 pub mod label;
+pub mod slider;
 
 #[derive(Clone)]
 pub struct UIContext {

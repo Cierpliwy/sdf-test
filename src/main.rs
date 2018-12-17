@@ -9,6 +9,7 @@ use crate::renderer_thread::{
 use crate::ui::block::*;
 use crate::ui::button::*;
 use crate::ui::label::*;
+use crate::ui::slider::*;
 use crate::ui::*;
 use crate::utils::*;
 
@@ -46,6 +47,10 @@ fn main() {
         block_context.clone(),
         label_context.clone(),
     ));
+    let slider_context = Rc::new(UISliderContext::new(
+        block_context.clone(),
+        label_context.clone(),
+    ));
 
     // Create UI elements
     let mut label = UILabel::new(
@@ -56,37 +61,14 @@ fn main() {
         [1.0, 1.0, 1.0, 1.0],
         [0.0, 0.0, 0.0, 1.0],
     );
-
-    let background_style = UIBlockStyle {
-        alpha: 0.5,
-        radius: 0.0,
-        sharpness: 0.0,
-        left_offset: -1.0,
-        left_color: [0.0, 0.0, 0.0],
-        right_offset: 0.0,
-        right_color: [0.0, 1.0, 0.0],
-        inner_shadow: -1.0,
-        shade_color: [0.0, 0.0, 0.0],
-    };
-    let bb_style = UIBlockStyle {
-        right_color: [1.0, 0.0, 0.0],
-        ..background_style
-    };
-    let label_background = UIBlock::new(block_context.clone());
-    let label_bounding_box = UIBlock::new(block_context.clone());
     let mut button = UIButton::new(button_context.clone(), "Show textures");
-    let mut button_pressed = false;
+    let mut slider = UISlider::new(slider_context.clone(), 0.0, 100.0, 5.0, 50.0);
 
     // Create screen layout
     let screen: UIScreen = Rc::new(Cell::new(UIScreenInfo::new(screen_dim, 1.0)));
     let label_layout = UIRelativeLayout::new(&screen, [0.2, 0.4], [0.3, 0.5]);
-    let bb = label.get_bounding_box();
-    let label_bb_layout = UIAbsoluteLayout::new(
-        &label_layout,
-        [bb.width(), bb.height()],
-        [bb.min.x, bb.min.y],
-    );
     let button_layout = UIRelativeLayout::new(&screen, [0.2, 0.1], [0.5, 0.5]);
+    let slider_layout = UIRelativeLayout::new(&screen, [0.2, 0.1], [0.5, 0.38]);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -126,6 +108,7 @@ fn main() {
         // Render UI
         label.render(&mut target, &label_layout);
         button.render(&mut target, &button_layout);
+        slider.render(&mut target, &slider_layout);
 
         // Vsync
         target.finish().expect("finish failed");
