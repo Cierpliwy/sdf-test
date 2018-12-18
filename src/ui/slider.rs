@@ -118,6 +118,7 @@ impl UISlider {
         let value = ((pos - layout.pos[0]) / layout.size[0]).max(0.0).min(1.0);
         (value * (self.max_value - self.min_value) / self.step_value + 0.5).floor()
             * self.step_value
+            + self.min_value
     }
 
     fn value_to_pos(&self, value: f32, layout: UILayoutResult) -> f32 {

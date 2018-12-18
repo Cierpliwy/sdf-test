@@ -68,7 +68,7 @@ fn main() {
             },
         ));
 
-        let slider = wm.create(UISlider::new(&slider_context, 0.0, 100.0, 5.0, 50.0));
+        let slider = wm.create(UISlider::new(&slider_context, 100.0, 1000.0, 5.0, 500.0));
         let button = wm.create(UIButton::new(&button_context, "Show textures"));
 
         (label, slider, button)
