@@ -211,6 +211,17 @@ fn main() {
             }
             _ => (),
         });
+
+        // Handle user events
+        state.update_widget(|wm| {
+            wm.poll_events(button, |e| match e {
+                UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
+            });
+            wm.poll_events(slider, |e| match e {
+                UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
+                UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
+            })
+        });
     }
 
     renderer_command_sender

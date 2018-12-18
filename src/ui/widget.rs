@@ -73,14 +73,21 @@ impl<T: UIWidget> UIWidgetState for UITypedWidgetState<T> {
     }
 
     fn update_input(&mut self, layout: UILayoutResult, frame_input: UIFrameInput) {
-        self.widget.update_input(layout, frame_input)
+        self.widget
+            .update_input(layout, frame_input, &mut self.events);
     }
 }
 
 pub trait UIWidget {
     type Event;
     fn render(&self, frame: &mut Frame, layout: UILayoutResult);
-    fn update_input(&mut self, _layout: UILayoutResult, _frame_input: UIFrameInput) {}
+    fn update_input(
+        &mut self,
+        _layout: UILayoutResult,
+        _frame_input: UIFrameInput,
+        _events: &mut Vec<Self::Event>,
+    ) {
+    }
 }
 
 #[derive(Copy, Clone)]

@@ -27,11 +27,11 @@ impl UIButtonContext {
 }
 
 pub struct UIButton {
-    context: Rc<UIButtonContext>,
     block: UIBlock,
     label: UILabel,
     hover: bool,
     pressed: bool,
+    active: bool,
     toggled: bool,
     hover_from: f32,
     hover_to: f32,
@@ -67,11 +67,11 @@ impl UIButton {
         );
 
         Self {
-            context,
             block,
             label,
             hover: false,
             pressed: false,
+            active: false,
             toggled: false,
             hover_from: 0.0,
             hover_to: 0.0,
@@ -79,41 +79,13 @@ impl UIButton {
         }
     }
 
-    pub fn set_hover(&mut self, hover: bool) {
-        if self.hover {
-            if !hover {
-                self.hover_from = self.hover_value();
-                self.hover_to = 0.0;
-                self.hover_time = Instant::now();
-            }
-        } else {
-            if hover {
-                self.hover_from = self.hover_value();
-                self.hover_to = 1.0;
-                self.hover_time = Instant::now();
-            }
-        }
-        self.hover = hover;
-    }
-
-    pub fn get_hover(&self) -> bool {
-        self.hover
-    }
-
-    pub fn set_toggled(&mut self, toggled: bool) {
-        self.toggled = toggled;
-    }
-
-    pub fn get_toggled(&self) -> bool {
-        self.toggled
-    }
-
-    pub fn set_pressed(&mut self, pressed: bool) {
-        self.pressed = pressed;
-    }
-
-    pub fn get_pressed(&self) -> bool {
-        self.pressed
+    fn calc_layout(&self, layout: UILayoutResult) -> UILayoutResult {
+        let scale = 1.0 + 0.1 * self.hover_value();
+        let scale_layout = UIScaleLayout {
+            scale: [scale, scale],
+            anchor: [0.5, 0.5],
+        };
+        scale_layout.layout(layout)
     }
 
     fn hover_value(&self) -> f32 {
@@ -131,16 +103,12 @@ impl UIWidget for UIButton {
     type Event = UIButtonEvent;
 
     fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
+        let scale = 1.0 + 0.1 * self.hover_value();
         let hover_value = self.hover_value();
-        let pressed_value = if self.pressed { 1.0 } else { 0.0 };
+        let pressed_value = if self.active { 1.0 } else { 0.0 };
         let toggle_value = if self.toggled { 1.0 } else { 0.1 };
 
-        let scale = 1.0 + 0.1 * hover_value;
-        let scale_layout = UIScaleLayout {
-            scale: [scale, scale],
-            anchor: [0.5, 0.5],
-        };
-        let scale_layout = scale_layout.layout(layout);
+        let scale_layout = self.calc_layout(layout);
         let size = scale_layout.size;
 
         let style = UIBlockStyle {
@@ -154,8 +122,8 @@ impl UIWidget for UIButton {
             ],
             right_offset: size[0] * 3.0,
             right_color: [0.6, 0.1, 0.9],
-            radius: 4.0 - 2.0 * hover_value,
-            inner_shadow: 10.0,
+            radius: 4.0 + 2.0 * hover_value,
+            inner_shadow: 10.0 + 10.0 * pressed_value,
             shade_color: [pressed_value, pressed_value, pressed_value],
         };
 
@@ -173,14 +141,45 @@ impl UIWidget for UIButton {
         self.label.render_styled(frame, scale_layout, label_style);
     }
 
-    fn update_input(&mut self, layout: UILayoutResult, frame_input: UIFrameInput) {
-        let scale = 1.0 + 0.1 * self.hover_value();
-        let scale_layout = UIScaleLayout {
-            scale: [scale, scale],
-            anchor: [0.5, 0.5],
-        };
-        let scale_layout = scale_layout.layout(layout);
+    fn update_input(
+        &mut self,
+        layout: UILayoutResult,
+        frame_input: UIFrameInput,
+        events: &mut Vec<UIButtonEvent>,
+    ) {
+        let scale_layout = self.calc_layout(layout);
         let hover = scale_layout.is_inside(frame_input.mouse_pos);
-        self.set_hover(hover);
+        let pressed = frame_input.left_mouse_button_pressed;
+
+        if self.hover {
+            if !hover {
+                self.hover_from = self.hover_value();
+                self.hover_to = 0.0;
+                self.hover_time = Instant::now();
+            }
+        } else {
+            if hover {
+                self.hover_from = self.hover_value();
+                self.hover_to = 1.0;
+                self.hover_time = Instant::now();
+            }
+        }
+
+        if !self.active && !self.pressed && pressed && hover {
+            self.active = true;
+        }
+
+        if self.active && self.pressed && !pressed && hover {
+            let toggled = !self.toggled;
+            events.push(UIButtonEvent::Toggled(toggled));
+            self.toggled = toggled;
+        }
+
+        if self.active && !(hover && pressed) {
+            self.active = false;
+        }
+
+        self.pressed = pressed;
+        self.hover = hover;
     }
 }
