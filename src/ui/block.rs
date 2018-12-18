@@ -1,9 +1,10 @@
-use super::{UIContext, UILayout};
-
+use crate::ui::layout::UILayoutResult;
+use crate::ui::widget::UIWidget;
+use glium::backend::Facade;
 use glium::draw_parameters::DrawParameters;
 use glium::index::PrimitiveType;
 use glium::{
-    implement_vertex, program, uniform, Blend, IndexBuffer, Program, Surface, VertexBuffer,
+    implement_vertex, program, uniform, Blend, Frame, IndexBuffer, Program, Surface, VertexBuffer,
 };
 use std::rc::Rc;
 
@@ -21,17 +22,14 @@ impl UIBlockVertex {
 implement_vertex!(UIBlockVertex, pos);
 
 pub struct UIBlockContext {
-    ui_context: UIContext,
     program: Program,
     vertex_buffer: VertexBuffer<UIBlockVertex>,
     index_buffer: IndexBuffer<u16>,
 }
 
 impl UIBlockContext {
-    pub fn new(ui_context: UIContext) -> Self {
-        let gl_context = &ui_context.gl_context;
-
-        let program = program!(gl_context, 140 => {
+    pub fn new<F: ?Sized + Facade>(facade: &F) -> Self {
+        let program = program!(facade, 140 => {
         vertex: r#"
             #version 140
             
@@ -88,7 +86,7 @@ impl UIBlockContext {
         }).expect("Cannot create program for UIBlock");
 
         let vertex_buffer = VertexBuffer::immutable(
-            gl_context,
+            facade,
             &[
                 UIBlockVertex::new(0.0, 0.0),
                 UIBlockVertex::new(0.0, 1.0),
@@ -98,15 +96,11 @@ impl UIBlockContext {
         )
         .expect("Cannot create vertex buffer for UIBlock");
 
-        let index_buffer = IndexBuffer::immutable(
-            gl_context,
-            PrimitiveType::TrianglesList,
-            &[0, 1, 2, 0, 2, 3],
-        )
-        .expect("Cannot create index buffer for UIBlock");
+        let index_buffer =
+            IndexBuffer::immutable(facade, PrimitiveType::TrianglesList, &[0, 1, 2, 0, 2, 3])
+                .expect("Cannot create index buffer for UIBlock");
 
         Self {
-            ui_context,
             program,
             vertex_buffer,
             index_buffer,
@@ -114,6 +108,7 @@ impl UIBlockContext {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct UIBlockStyle {
     pub alpha: f32,
     pub radius: f32,
@@ -129,25 +124,29 @@ pub struct UIBlockStyle {
 #[derive(Clone)]
 pub struct UIBlock {
     context: Rc<UIBlockContext>,
+    style: UIBlockStyle,
 }
 
 impl UIBlock {
-    pub fn new(context: Rc<UIBlockContext>) -> Self {
-        Self { context }
+    pub fn new(context: Rc<UIBlockContext>, style: UIBlockStyle) -> Self {
+        Self { context, style }
     }
 
-    pub fn render<S: ?Sized + Surface>(
-        &self,
-        surface: &mut S,
-        style: &UIBlockStyle,
-        layout: &UILayout,
-    ) {
-        let size = layout.get_size();
-        let pos = layout.get_pos();
-        let screen = layout.get_screen().get().size;
+    pub fn set_style(&mut self, style: UIBlockStyle) {
+        self.style = style;
+    }
+
+    pub fn get_style(&self) -> UIBlockStyle {
+        self.style
+    }
+
+    pub fn render_styled(&self, frame: &mut Frame, layout: UILayoutResult, style: UIBlockStyle) {
+        let UILayoutResult { size, pos } = layout;
+        let screen = frame.get_dimensions();
+        let screen = [screen.0 as f32, screen.1 as f32];
         let limit = size[0].min(size[1]) / 2.0;
 
-        surface
+        frame
             .draw(
                 &self.context.vertex_buffer,
                 &self.context.index_buffer,
@@ -173,5 +172,13 @@ impl UIBlock {
                 },
             )
             .expect("Cannot draw UIBlock");
+    }
+}
+
+impl UIWidget for UIBlock {
+    type Event = ();
+
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
+        self.render_styled(frame, layout, self.style);
     }
 }

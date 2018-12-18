@@ -9,13 +9,14 @@ use crate::renderer_thread::{
 use crate::ui::block::*;
 use crate::ui::button::*;
 use crate::ui::label::*;
+use crate::ui::layout::*;
 use crate::ui::slider::*;
 use crate::ui::*;
 use crate::utils::*;
 
 use glium::{glutin, Surface};
 use sdf::font::Font;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -23,7 +24,7 @@ use std::time::Instant;
 
 fn main() {
     // Create GL objects
-    let screen_dim = [685.0f32, 480.0];
+    let screen_dim = [640.0, 480.0];
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_dimensions((screen_dim[0] as f64, screen_dim[1] as f64).into())
@@ -31,9 +32,11 @@ fn main() {
     let context = glutin::ContextBuilder::new().with_vsync(false);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
+    // Create state
+    let mut state = UIState::new(screen_dim[0], screen_dim[1]);
+
     // Create UI contexts
-    let ui_context = UIContext::new(&display);
-    let block_context = Rc::new(UIBlockContext::new(ui_context.clone()));
+    let block_context = Rc::new(UIBlockContext::new(&display));
     let font = Font::new(
         1024,
         1024,
@@ -42,7 +45,7 @@ fn main() {
         (&include_bytes!("../assets/monserat.ttf")[..]).into(),
     )
     .expect("Cannot load UI font");
-    let label_context = Rc::new(RefCell::new(UILabelContext::new(ui_context, font)));
+    let label_context = Rc::new(RefCell::new(UILabelContext::new(&display, font)));
     let button_context = Rc::new(UIButtonContext::new(
         block_context.clone(),
         label_context.clone(),
@@ -53,22 +56,48 @@ fn main() {
     ));
 
     // Create UI elements
-    let mut label = UILabel::new(
-        label_context.clone(),
-        "Trademark(R)",
-        20.0,
-        UILabelAlignment::Left,
-        [1.0, 1.0, 1.0, 1.0],
-        [0.0, 0.0, 0.0, 1.0],
-    );
-    let mut button = UIButton::new(button_context.clone(), "Show textures");
-    let mut slider = UISlider::new(slider_context.clone(), 0.0, 100.0, 5.0, 50.0);
+    let (label, slider, button) = state.update_widget(|wm| {
+        let label = wm.create(UILabel::new(
+            label_context.clone(),
+            "Trademark(R)",
+            UILabelStyle {
+                size: 20.0,
+                align: UILabelAlignment::Left,
+                color: [1.0, 1.0, 1.0, 1.0],
+                shadow_color: [0.0, 0.0, 0.0, 1.0],
+            },
+        ));
+
+        let slider = wm.create(UISlider::new(slider_context.clone(), 0.0, 100.0, 5.0, 50.0));
+        let button = wm.create(UIButton::new(button_context.clone(), "Show textures"));
+
+        (label, slider, button)
+    });
 
     // Create screen layout
-    let screen: UIScreen = Rc::new(Cell::new(UIScreenInfo::new(screen_dim, 1.0)));
-    let label_layout = UIRelativeLayout::new(&screen, [0.2, 0.4], [0.3, 0.5]);
-    let button_layout = UIRelativeLayout::new(&screen, [0.2, 0.1], [0.5, 0.5]);
-    let slider_layout = UIRelativeLayout::new(&screen, [0.2, 0.1], [0.5, 0.38]);
+    let (label_layout, slider_layout, button_layout) = state.update_layout(|lm| {
+        let label_layout = lm.root(UIRelativeLayout {
+            size: [0.2, 0.4],
+            pos: [0.3, 0.5],
+        });
+
+        let slider_layout = lm.root(UIRelativeLayout {
+            size: [0.2, 0.1],
+            pos: [0.5, 0.38],
+        });
+
+        let button_layout = lm.root(UIRelativeLayout {
+            size: [0.2, 0.1],
+            pos: [0.5, 0.5],
+        });
+
+        (label_layout, slider_layout, button_layout)
+    });
+
+    // Pin views
+    state.pin_widget(label.into(), label_layout.into());
+    state.pin_widget(slider.into(), slider_layout.into());
+    state.pin_widget(button.into(), button_layout.into());
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -87,13 +116,15 @@ fn main() {
     let mut fps_array = [0.0; 64];
     let mut fps_index = 0;
     let mut start_frame_time: Option<Instant> = None;
-    let mut mouse_pos = [0.0, 0.0];
-    let mut mouse_pressed = false;
 
     while !exit {
         // FPS counting
         let avg_fps: f64 = fps_array.iter().sum::<f64>() / fps_array.len() as f64;
-        label.set_text(&format!("FPS: {:.2}", avg_fps));
+        state.update_widget(|wm| {
+            wm.update(label, |l| {
+                l.set_text(&format!("FPS: {:.2}", avg_fps));
+            })
+        });
         if let Some(time) = start_frame_time {
             let fps = 1.0 / time.elapsed_seconds();
             fps_array[fps_index] = fps;
@@ -106,9 +137,7 @@ fn main() {
         target.clear_color(0.02, 0.02, 0.02, 1.0);
 
         // Render UI
-        label.render(&mut target, &label_layout);
-        button.render(&mut target, &button_layout);
-        slider.render(&mut target, &slider_layout);
+        state.render(&mut target);
 
         // Vsync
         target.finish().expect("finish failed");
@@ -131,33 +160,29 @@ fn main() {
                     }
                 }
                 glutin::WindowEvent::CursorMoved { position, .. } => {
-                    mouse_pos = [
-                        position.x as f32,
-                        screen.get().get_size()[1] - position.y as f32,
-                    ];
-
-                    button.set_hover(button_layout.is_inside(mouse_pos));
+                    let height = state.layout(|lm| lm.get_height());
+                    state.set_mouse_pos([position.x as f32, height - position.y as f32]);
                 }
                 glutin::WindowEvent::MouseInput {
-                    button: b, state, ..
+                    button: b,
+                    state: button_state,
+                    ..
                 } => {
-                    mouse_pressed =
-                        b == glutin::MouseButton::Left && state == glutin::ElementState::Pressed;
-
-                    if button_layout.is_inside(mouse_pos) {
-                        if button.get_pressed() && !mouse_pressed {
-                            button.set_toggled(!button.get_toggled());
-                        }
-                        button.set_pressed(mouse_pressed);
-                    }
+                    state.set_left_mouse_button_pressed(
+                        b == glutin::MouseButton::Left
+                            && button_state == glutin::ElementState::Pressed,
+                    );
+                    state.set_right_mouse_button_pressed(
+                        b == glutin::MouseButton::Right
+                            && button_state == glutin::ElementState::Pressed,
+                    );
                 }
                 glutin::WindowEvent::CloseRequested => exit = true,
                 glutin::WindowEvent::Resized(position) => {
-                    let res = [position.width as f32, position.height as f32];
-                    screen.set(UIScreenInfo::new(
-                        [res[0], res[1]],
-                        screen.get().get_ratio(),
-                    ))
+                    state.update_layout(|lm| {
+                        lm.set_width(position.width as f32);
+                        lm.set_height(position.height as f32);
+                    });
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {
                     if c == 's' {

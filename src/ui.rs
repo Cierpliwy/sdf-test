@@ -1,177 +1,80 @@
-use glium::backend::{Context, Facade};
-use std::cell::Cell;
-use std::rc::Rc;
+use crate::ui::layout::{UILayoutId, UILayoutManager};
+use crate::ui::widget::{UIWidgetId, UIWidgetManager};
+use glium::Frame;
 
 pub mod block;
 pub mod button;
 pub mod label;
+pub mod layout;
 pub mod slider;
-
-#[derive(Clone)]
-pub struct UIContext {
-    gl_context: Rc<Context>,
-}
-
-impl UIContext {
-    pub fn new<F: ?Sized + Facade>(facade: &F) -> Self {
-        Self {
-            gl_context: facade.get_context().clone(),
-        }
-    }
-}
+pub mod widget;
 
 #[derive(Copy, Clone)]
-pub struct UIScreenInfo {
-    size: [f32; 2],
-    ratio: f32,
+pub struct UIFrameInput {
+    mouse_pos: [f32; 2],
+    left_mouse_button_pressed: bool,
+    right_mouse_button_pressed: bool,
 }
 
-impl UIScreenInfo {
-    pub fn new(size: [f32; 2], ratio: f32) -> Self {
-        Self { size, ratio }
-    }
-
-    pub fn get_ratio(&self) -> f32 {
-        self.ratio
-    }
-
-    pub fn get_size(&self) -> [f32; 2] {
-        self.size
-    }
+pub struct UIState {
+    layout_manager: UILayoutManager,
+    widget_manager: UIWidgetManager,
+    frame_input: UIFrameInput,
+    pinned_widgets: Vec<(UILayoutId, UIWidgetId)>,
 }
 
-pub type UIScreen = Rc<Cell<UIScreenInfo>>;
-
-pub trait UILayout {
-    fn get_screen(&self) -> UIScreen;
-    fn get_pos(&self) -> [f32; 2];
-    fn get_size(&self) -> [f32; 2];
-    fn is_inside(&self, point: [f32; 2]) -> bool {
-        let pos = self.get_pos();
-        let size = self.get_size();
-        point[0] >= pos[0]
-            && point[0] <= pos[0] + size[0]
-            && point[1] >= pos[1]
-            && point[1] <= pos[1] + size[1]
-    }
-}
-
-impl UILayout for UIScreen {
-    fn get_screen(&self) -> UIScreen {
-        self.clone()
-    }
-
-    fn get_pos(&self) -> [f32; 2] {
-        [0.0, 0.0]
-    }
-
-    fn get_size(&self) -> [f32; 2] {
-        self.get().size
-    }
-}
-
-// ============ Absolute Layout =========================================================
-
-pub struct UIAbsoluteLayout<'a> {
-    parent: &'a UILayout,
-    size: [f32; 2],
-    pos: [f32; 2],
-}
-
-impl<'a> UIAbsoluteLayout<'a> {
-    pub fn new(parent: &'a UILayout, size: [f32; 2], pos: [f32; 2]) -> Self {
-        Self { parent, size, pos }
-    }
-}
-
-impl UILayout for UIAbsoluteLayout<'_> {
-    fn get_screen(&self) -> Rc<Cell<UIScreenInfo>> {
-        self.parent.get_screen()
-    }
-
-    fn get_pos(&self) -> [f32; 2] {
-        let pos = self.parent.get_pos();
-        let ratio = self.get_screen().get().ratio;
-        [pos[0] + self.pos[0] * ratio, pos[1] + self.pos[1] * ratio]
-    }
-
-    fn get_size(&self) -> [f32; 2] {
-        self.size
-    }
-}
-
-// ============ Relative Layout =========================================================
-
-pub struct UIRelativeLayout<'a> {
-    parent: &'a UILayout,
-    size: [f32; 2],
-    pos: [f32; 2],
-}
-
-impl<'a> UIRelativeLayout<'a> {
-    pub fn new(parent: &'a UILayout, size: [f32; 2], pos: [f32; 2]) -> Self {
-        Self { parent, size, pos }
-    }
-}
-
-impl UILayout for UIRelativeLayout<'_> {
-    fn get_screen(&self) -> Rc<Cell<UIScreenInfo>> {
-        self.parent.get_screen()
-    }
-
-    fn get_pos(&self) -> [f32; 2] {
-        let size = self.parent.get_size();
-        let pos = self.parent.get_pos();
-        [
-            pos[0] + size[0] * self.pos[0],
-            pos[1] + size[1] * self.pos[1],
-        ]
-    }
-
-    fn get_size(&self) -> [f32; 2] {
-        let size = self.parent.get_size();
-        [size[0] * self.size[0], size[1] * self.size[1]]
-    }
-}
-
-// ============ Scale Layout =========================================================
-
-pub struct UIScaleLayout<'a> {
-    parent: &'a UILayout,
-    scale: [f32; 2],
-    anchor: [f32; 2],
-}
-
-impl<'a> UIScaleLayout<'a> {
-    pub fn new(parent: &'a UILayout, scale: [f32; 2], anchor: [f32; 2]) -> Self {
+impl UIState {
+    pub fn new(width: f32, height: f32) -> Self {
         Self {
-            parent,
-            scale,
-            anchor,
+            frame_input: UIFrameInput {
+                mouse_pos: [0.0, 0.0],
+                left_mouse_button_pressed: false,
+                right_mouse_button_pressed: false,
+            },
+            layout_manager: UILayoutManager::new(width, height),
+            widget_manager: UIWidgetManager::new(),
+            pinned_widgets: Vec::new(),
         }
     }
-}
 
-impl UILayout for UIScaleLayout<'_> {
-    fn get_screen(&self) -> Rc<Cell<UIScreenInfo>> {
-        self.parent.get_screen()
+    pub fn set_mouse_pos(&mut self, mouse_pos: [f32; 2]) {
+        self.frame_input.mouse_pos = mouse_pos;
     }
 
-    fn get_pos(&self) -> [f32; 2] {
-        let size = self.parent.get_size();
-        let pos = self.parent.get_pos();
-        let origin = [
-            self.anchor[0] * size[0] + pos[0],
-            self.anchor[1] * size[1] + pos[1],
-        ];
-        [
-            (pos[0] - origin[0]) * self.scale[0] + origin[0],
-            (pos[1] - origin[1]) * self.scale[1] + origin[1],
-        ]
+    pub fn set_left_mouse_button_pressed(&mut self, pressed: bool) {
+        self.frame_input.left_mouse_button_pressed = pressed;
     }
 
-    fn get_size(&self) -> [f32; 2] {
-        let size = self.parent.get_size();
-        [size[0] * self.scale[0], size[1] * self.scale[1]]
+    pub fn set_right_mouse_button_pressed(&mut self, pressed: bool) {
+        self.frame_input.right_mouse_button_pressed = pressed;
+    }
+
+    pub fn pin_widget(&mut self, widget: UIWidgetId, layout: UILayoutId) {
+        self.pinned_widgets.push((layout, widget))
+    }
+
+    pub fn render(&mut self, frame: &mut Frame) {
+        for (layout, view) in &self.pinned_widgets {
+            let layout_result = self.layout_manager.layout(Some(*layout));
+            self.widget_manager
+                .update_input(*view, layout_result, self.frame_input);
+            self.widget_manager.render(frame, *view, layout_result);
+        }
+    }
+
+    pub fn layout<R, F: Fn(&UILayoutManager) -> R>(&self, func: F) -> R {
+        func(&self.layout_manager)
+    }
+
+    pub fn update_layout<R, F: Fn(&mut UILayoutManager) -> R>(&mut self, func: F) -> R {
+        func(&mut self.layout_manager)
+    }
+
+    pub fn widget<R, F: Fn(&UIWidgetManager) -> R>(&self, func: F) -> R {
+        func(&self.widget_manager)
+    }
+
+    pub fn update_widget<R, F: Fn(&mut UIWidgetManager) -> R>(&mut self, func: F) -> R {
+        func(&mut self.widget_manager)
     }
 }

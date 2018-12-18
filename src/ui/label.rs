@@ -1,10 +1,12 @@
-use crate::ui::{UIContext, UILayout};
+use crate::ui::layout::UILayoutResult;
+use crate::ui::widget::UIWidget;
+use glium::backend::{Context, Facade};
 use glium::draw_parameters::DrawParameters;
 use glium::index::PrimitiveType;
 use glium::texture::{ClientFormat, MipmapsOption, RawImage2d, Texture2d, TextureCreationError};
 use glium::{
-    implement_vertex, program, uniform, Blend, IndexBuffer, Program, Rect as GLRect, Surface,
-    VertexBuffer,
+    implement_vertex, program, uniform, Blend, Frame, IndexBuffer, Program, Rect as GLRect,
+    Surface, VertexBuffer,
 };
 use sdf::font::{Font, GlyphLayout, TextureRenderBatch};
 use sdf::geometry::Rect;
@@ -15,17 +17,18 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct UILabelContext {
-    context: UIContext,
+    context: Rc<Context>,
     program: Program,
     font: Font,
     texture_cache: HashMap<u32, Texture2d>,
 }
 
 impl UILabelContext {
-    pub fn new(context: UIContext, font: Font) -> Self {
+    pub fn new<F: ?Sized + Facade>(facade: &F, font: Font) -> Self {
+        let context = facade.get_context().clone();
         let texture_cache = HashMap::new();
 
-        let program = program!(&context.gl_context, 140 => {
+        let program = program!(facade, 140 => {
         vertex: r#"
             #version 140
 
@@ -102,7 +105,7 @@ impl UILabelContext {
             None
         } else {
             Some(Texture2d::with_mipmaps(
-                &self.context.gl_context,
+                &self.context,
                 raw_texture,
                 MipmapsOption::NoMipmap,
             )?)
@@ -146,50 +149,54 @@ struct UILabelRenderPass {
     index_buffer: IndexBuffer<u16>,
 }
 
+#[derive(Copy, Clone)]
 pub enum UILabelAlignment {
     Left,
     Right,
     Center,
 }
 
+#[derive(Copy, Clone)]
+pub struct UILabelStyle {
+    pub align: UILabelAlignment,
+    pub size: f32,
+    pub color: [f32; 4],
+    pub shadow_color: [f32; 4],
+}
+
 pub struct UILabel {
-    align: UILabelAlignment,
+    style: UILabelStyle,
     text: String,
-    size: f32,
     bounding_box: Rect<f32>,
     passes: HashMap<u32, UILabelRenderPass>,
     context: Rc<RefCell<UILabelContext>>,
-    color: [f32; 4],
-    shadow_color: [f32; 4],
 }
 
 impl UILabel {
-    pub fn new(
-        context: Rc<RefCell<UILabelContext>>,
-        text: &str,
-        size: f32,
-        align: UILabelAlignment,
-        color: [f32; 4],
-        shadow_color: [f32; 4],
-    ) -> Self {
+    pub fn new(context: Rc<RefCell<UILabelContext>>, text: &str, style: UILabelStyle) -> Self {
         let mut label = Self {
-            align,
             context,
-            size,
             text: String::new(),
             bounding_box: Rect::new(0.0, 0.0, 0.0, 0.0),
             passes: HashMap::new(),
-            color,
-            shadow_color,
+            style,
         };
 
         label.set_text(text);
         label
     }
 
-    pub fn get_bounding_box(&self) -> Rect<f32> {
+    pub fn get_style(&self) -> UILabelStyle {
+        self.style
+    }
+
+    pub fn set_style(&mut self, style: UILabelStyle) {
+        self.style = style;
+    }
+
+    pub fn get_bounding_box(&self, style: UILabelStyle) -> Rect<f32> {
         let bb = self.bounding_box;
-        let size = self.size;
+        let size = style.size;
         Rect::new(
             bb.min.x * size,
             bb.min.y * size,
@@ -199,15 +206,15 @@ impl UILabel {
     }
 
     pub fn set_color(&mut self, color: [f32; 4]) {
-        self.color = color;
+        self.style.color = color;
     }
 
     pub fn set_shadow_color(&mut self, shadow_color: [f32; 4]) {
-        self.shadow_color = shadow_color;
+        self.style.shadow_color = shadow_color;
     }
 
     pub fn set_size(&mut self, size: f32) {
-        self.size = size
+        self.style.size = size
     }
 
     pub fn set_text(&mut self, text: &str) {
@@ -218,7 +225,7 @@ impl UILabel {
 
         let mut context = self.context.borrow_mut();
         let text_layout = context.font.layout_text_block(text);
-        let gl_context = &context.context.gl_context;
+        let gl_context = &context.context;
 
         struct PassData {
             vertices: Vec<UILabelGlyphVertex>,
@@ -282,19 +289,20 @@ impl UILabel {
         self.bounding_box = text_layout.bounding_box;
     }
 
-    pub fn render<S: ?Sized + Surface>(&self, surface: &mut S, layout: &UILayout) {
+    pub fn render_styled(&self, frame: &mut Frame, layout: UILayoutResult, style: UILabelStyle) {
+        let UILayoutResult { mut pos, size } = layout;
+        let screen = frame.get_dimensions();
+        let screen = [screen.0 as f32, screen.1 as f32];
+
         let context = self.context.borrow_mut();
         let shadow_size = context.font.get_shadow_size();
         let font_size = context.font.get_font_size();
         let font_sharpness = 0.4;
-        let sharpness = font_sharpness / shadow_size as f32 / (self.size / font_size as f32);
-        let mut pos = layout.get_pos();
-        let size = layout.get_size();
-        let screen = layout.get_screen();
+        let sharpness = font_sharpness / shadow_size as f32 / (style.size / font_size as f32);
 
-        let bb = self.get_bounding_box();
+        let bb = self.get_bounding_box(style);
         pos[1] = pos[1] - (bb.height() - size[1]) / 2.0;
-        match self.align {
+        match style.align {
             UILabelAlignment::Left => {}
             UILabelAlignment::Right => {
                 pos[0] = pos[0] + size[0] - bb.width();
@@ -306,7 +314,7 @@ impl UILabel {
 
         for (texture_id, pass_data) in &self.passes {
             if let Some(texture) = context.get_texture(*texture_id) {
-                surface
+                frame
                     .draw(
                         &pass_data.vertex_buffer,
                         &pass_data.index_buffer,
@@ -314,11 +322,11 @@ impl UILabel {
                         &uniform! {
                             uTexture: texture,
                             uSharpness: sharpness,
-                            uFontSize: self.size,
+                            uFontSize: style.size,
                             uPosition: pos,
-                            uScreen: screen.get_size(),
-                            uColor: self.color,
-                            uShadowColor: self.shadow_color
+                            uScreen: screen,
+                            uColor: style.color,
+                            uShadowColor: style.shadow_color
                         },
                         &DrawParameters {
                             blend: Blend::alpha_blending(),
@@ -329,5 +337,13 @@ impl UILabel {
                     .expect("Cannot draw UILabel pass");
             }
         }
+    }
+}
+
+impl UIWidget for UILabel {
+    type Event = ();
+
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
+        self.render_styled(frame, layout, self.style)
     }
 }
