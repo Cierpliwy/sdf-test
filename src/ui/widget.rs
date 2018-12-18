@@ -2,6 +2,7 @@ use crate::ui::layout::UILayoutResult;
 use crate::ui::UIFrameInput;
 use glium::Frame;
 
+#[derive(Default)]
 pub struct UIWidgetManager {
     widgets: Vec<Box<UIWidgetState>>,
 }
@@ -22,7 +23,7 @@ impl UIWidgetManager {
         let ptr = &mut *state as *mut UITypedWidgetState<T>;
         self.widgets.push(state);
         UITypedWidgetId {
-            id: id,
+            id,
             ptr,
             _marker: std::marker::PhantomData,
         }

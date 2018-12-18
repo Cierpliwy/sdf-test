@@ -22,6 +22,7 @@ pub fn solve_quadratic(a: f32, b: f32, c: f32) -> (Option<f32>, Option<f32>) {
     (Some(t1), Some(t2))
 }
 
+#[allow(clippy::many_single_char_names)]
 pub fn solve_cubic(a: f32, b: f32, c: f32, d: f32) -> (Option<f32>, Option<f32>, Option<f32>) {
     if a == 0.0 {
         let (r1, r2) = solve_quadratic(b, c, d);

@@ -39,7 +39,7 @@ pub struct UIButton {
 }
 
 impl UIButton {
-    pub fn new(context: Rc<UIButtonContext>, title: &str) -> Self {
+    pub fn new(context: &Rc<UIButtonContext>, title: &str) -> Self {
         let block = UIBlock::new(
             context.block_context.clone(),
             UIBlockStyle {
@@ -157,12 +157,10 @@ impl UIWidget for UIButton {
                 self.hover_to = 0.0;
                 self.hover_time = Instant::now();
             }
-        } else {
-            if hover {
-                self.hover_from = self.hover_value();
-                self.hover_to = 1.0;
-                self.hover_time = Instant::now();
-            }
+        } else if hover {
+            self.hover_from = self.hover_value();
+            self.hover_to = 1.0;
+            self.hover_time = Instant::now();
         }
 
         if !self.active && !self.pressed && pressed && hover {

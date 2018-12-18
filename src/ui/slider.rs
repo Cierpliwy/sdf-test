@@ -27,7 +27,6 @@ impl UISliderContext {
 }
 
 pub struct UISlider {
-    context: Rc<UISliderContext>,
     block: UIBlock,
     dot: UIBlock,
     label: UILabel,
@@ -45,7 +44,7 @@ pub struct UISlider {
 
 impl UISlider {
     pub fn new(
-        context: Rc<UISliderContext>,
+        context: &Rc<UISliderContext>,
         min_value: f32,
         max_value: f32,
         step_value: f32,
@@ -93,7 +92,6 @@ impl UISlider {
         );
 
         Self {
-            context,
             block,
             dot,
             label,
@@ -199,6 +197,7 @@ impl UIWidget for UISlider {
         self.label.render(frame, label_layout.layout(dot_layout));
     }
 
+    #[allow(clippy::float_cmp)]
     fn update_input(
         &mut self,
         layout: UILayoutResult,
@@ -215,12 +214,10 @@ impl UIWidget for UISlider {
                 self.hover_to = 0.0;
                 self.hover_time = Instant::now();
             }
-        } else {
-            if hover {
-                self.hover_from = self.hover_value();
-                self.hover_to = 1.0;
-                self.hover_time = Instant::now();
-            }
+        } else if hover {
+            self.hover_from = self.hover_value();
+            self.hover_to = 1.0;
+            self.hover_time = Instant::now();
         }
 
         if !self.pressed && pressed && hover && self.drag_value.is_none() {

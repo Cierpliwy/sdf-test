@@ -7,6 +7,6 @@ pub trait ElapsedSeconds {
 impl ElapsedSeconds for Instant {
     fn elapsed_seconds(&self) -> f64 {
         let duration = self.elapsed();
-        duration.as_secs() as f64 + duration.subsec_nanos() as f64 / 1_000_000_000f64
+        duration.as_secs() as f64 + f64::from(duration.subsec_nanos()) / 1_000_000_000f64
     }
 }

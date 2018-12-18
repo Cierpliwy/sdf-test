@@ -24,6 +24,7 @@ pub struct UILabelContext {
 }
 
 impl UILabelContext {
+    #[allow(clippy::redundant_closure)]
     pub fn new<F: ?Sized + Facade>(facade: &F, font: Font) -> Self {
         let context = facade.get_context().clone();
         let texture_cache = HashMap::new();
@@ -298,17 +299,18 @@ impl UILabel {
         let shadow_size = context.font.get_shadow_size();
         let font_size = context.font.get_font_size();
         let font_sharpness = 0.4;
-        let sharpness = font_sharpness / shadow_size as f32 / (style.size / font_size as f32);
+        let sharpness =
+            font_sharpness / f32::from(shadow_size) / (style.size / f32::from(font_size));
 
         let bb = self.get_bounding_box(style);
-        pos[1] = pos[1] - (bb.height() - size[1]) / 2.0;
+        pos[1] -= (bb.height() - size[1]) / 2.0;
         match style.align {
             UILabelAlignment::Left => {}
             UILabelAlignment::Right => {
-                pos[0] = pos[0] + size[0] - bb.width();
+                pos[0] += size[0] - bb.width();
             }
             UILabelAlignment::Center => {
-                pos[0] = pos[0] + (size[0] - bb.width()) / 2.0;
+                pos[0] += (size[0] - bb.width()) / 2.0;
             }
         };
 

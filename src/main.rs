@@ -27,7 +27,7 @@ fn main() {
     let screen_dim = [640.0, 480.0];
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
-        .with_dimensions((screen_dim[0] as f64, screen_dim[1] as f64).into())
+        .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
         .with_title("Multi-channel signed distance font demo - by Cierpliwy");
     let context = glutin::ContextBuilder::new().with_vsync(false);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
@@ -68,8 +68,8 @@ fn main() {
             },
         ));
 
-        let slider = wm.create(UISlider::new(slider_context.clone(), 0.0, 100.0, 5.0, 50.0));
-        let button = wm.create(UIButton::new(button_context.clone(), "Show textures"));
+        let slider = wm.create(UISlider::new(&slider_context, 0.0, 100.0, 5.0, 50.0));
+        let button = wm.create(UIButton::new(&button_context, "Show textures"));
 
         (label, slider, button)
     });

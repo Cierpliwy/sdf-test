@@ -168,6 +168,7 @@ impl Curve {
             / 6.0
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn signed_distance(&self, p: Point2<f32>) -> SignedDistance {
         let p = p.to_vec();
         let p0 = self.p0.to_vec();

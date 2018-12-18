@@ -20,6 +20,7 @@ pub enum RendererResult {
     ShapesRendered(TextureRenderBatch),
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn renderer_entry_point(context: RendererContext) -> Result<(), RecvError> {
     println!("Renderer thread started");
     loop {

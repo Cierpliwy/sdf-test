@@ -28,6 +28,7 @@ pub struct UIBlockContext {
 }
 
 impl UIBlockContext {
+    #[allow(clippy::redundant_closure)]
     pub fn new<F: ?Sized + Facade>(facade: &F) -> Self {
         let program = program!(facade, 140 => {
         vertex: r#"

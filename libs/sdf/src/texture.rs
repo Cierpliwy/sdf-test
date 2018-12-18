@@ -187,7 +187,7 @@ impl<'a> LockedTexture<'a> {
                     }
                 }
 
-                let mut pixel = func(PixelView {
+                let pixel = func(PixelView {
                     x: x - view.view.min.x,
                     y: y - view.view.min.y,
                     width: view.view.width(),
