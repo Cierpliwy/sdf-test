@@ -58,7 +58,12 @@ impl UIState {
             let layout_result = self.layout_manager.layout(Some(*layout));
             self.widget_manager
                 .update_input(*view, layout_result, self.frame_input);
-            self.widget_manager.render(frame, *view, layout_result);
+            self.widget_manager.render(
+                frame,
+                *view,
+                layout_result,
+                self.layout_manager.get_screen(),
+            );
         }
     }
 

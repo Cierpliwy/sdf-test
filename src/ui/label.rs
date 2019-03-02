@@ -1,4 +1,4 @@
-use crate::ui::layout::UILayoutResult;
+use crate::ui::layout::{UILayoutResult, UIScreen};
 use crate::ui::widget::UIWidget;
 use glium::backend::{Context, Facade};
 use glium::draw_parameters::DrawParameters;
@@ -290,10 +290,15 @@ impl UILabel {
         self.bounding_box = text_layout.bounding_box;
     }
 
-    pub fn render_styled(&self, frame: &mut Frame, layout: UILayoutResult, style: UILabelStyle) {
+    pub fn render_styled(
+        &self,
+        frame: &mut Frame,
+        layout: UILayoutResult,
+        style: UILabelStyle,
+        screen: UIScreen,
+    ) {
         let UILayoutResult { mut pos, size } = layout;
-        let screen = frame.get_dimensions();
-        let screen = [screen.0 as f32, screen.1 as f32];
+        let screen = [screen.width, screen.height];
 
         let context = self.context.borrow_mut();
         let shadow_size = context.font.get_shadow_size();
@@ -345,7 +350,7 @@ impl UILabel {
 impl UIWidget for UILabel {
     type Event = ();
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
-        self.render_styled(frame, layout, self.style)
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
+        self.render_styled(frame, layout, self.style, screen)
     }
 }

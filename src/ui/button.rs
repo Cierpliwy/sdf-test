@@ -1,6 +1,6 @@
 use crate::ui::block::{UIBlock, UIBlockContext, UIBlockStyle};
 use crate::ui::label::{UILabel, UILabelAlignment, UILabelContext, UILabelStyle};
-use crate::ui::layout::{UILayout, UILayoutResult, UIScaleLayout};
+use crate::ui::layout::{UILayout, UILayoutResult, UIScaleLayout, UIScreen};
 use crate::ui::widget::UIWidget;
 use crate::ui::UIFrameInput;
 use crate::utils::*;
@@ -102,7 +102,7 @@ pub enum UIButtonEvent {
 impl UIWidget for UIButton {
     type Event = UIButtonEvent;
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
         let scale = 1.0 + 0.1 * self.hover_value();
         let hover_value = self.hover_value();
         let pressed_value = if self.active { 1.0 } else { 0.0 };
@@ -127,7 +127,7 @@ impl UIWidget for UIButton {
             shade_color: [pressed_value, pressed_value, pressed_value],
         };
 
-        self.block.render_styled(frame, scale_layout, style);
+        self.block.render_styled(frame, scale_layout, style, screen);
         let label_style = UILabelStyle {
             size: 25.0 * scale,
             color: [
@@ -138,7 +138,8 @@ impl UIWidget for UIButton {
             ],
             ..self.label.get_style()
         };
-        self.label.render_styled(frame, scale_layout, label_style);
+        self.label
+            .render_styled(frame, scale_layout, label_style, screen);
     }
 
     fn update_input(

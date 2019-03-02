@@ -1,6 +1,6 @@
 use crate::ui::block::{UIBlock, UIBlockContext, UIBlockStyle};
 use crate::ui::label::{UILabel, UILabelAlignment, UILabelContext, UILabelStyle};
-use crate::ui::layout::{UIAbsoluteLayout, UILayout, UILayoutResult, UIScaleLayout};
+use crate::ui::layout::{UIAbsoluteLayout, UILayout, UILayoutResult, UIScaleLayout, UIScreen};
 use crate::ui::widget::UIWidget;
 use crate::ui::UIFrameInput;
 use crate::utils::*;
@@ -158,7 +158,7 @@ pub enum UISliderEvent {
 impl UIWidget for UISlider {
     type Event = UISliderEvent;
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
         let UILayoutResult { size, .. } = layout;
 
         // Dot layout
@@ -178,7 +178,7 @@ impl UIWidget for UISlider {
         };
         let background_layout = background_layout.layout(layout);
         self.block
-            .render_styled(frame, background_layout, background_style);
+            .render_styled(frame, background_layout, background_style, screen);
 
         // Dot
         let pressed_value = if self.drag_value.is_some() { 1.0 } else { 0.0 };
@@ -187,7 +187,7 @@ impl UIWidget for UISlider {
             radius: 8.0 * (1.0 + 0.3 * self.hover_value()),
             ..self.dot.get_style()
         };
-        self.dot.render_styled(frame, dot_layout, dot_style);
+        self.dot.render_styled(frame, dot_layout, dot_style, screen);
 
         // Label
         let label_layout = UIAbsoluteLayout {
@@ -195,7 +195,8 @@ impl UIWidget for UISlider {
             size: dot_layout.size,
         };
 
-        self.label.render(frame, label_layout.layout(dot_layout));
+        self.label
+            .render(frame, label_layout.layout(dot_layout), screen);
     }
 
     #[allow(clippy::float_cmp)]

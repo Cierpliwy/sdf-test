@@ -1,32 +1,28 @@
+#[derive(Clone, Copy)]
+pub struct UIScreen {
+    pub width: f32,
+    pub height: f32,
+}
+
 pub struct UILayoutManager {
-    width: f32,
-    height: f32,
+    screen: UIScreen,
     layouts: Vec<UILayoutSlot>,
 }
 
 impl UILayoutManager {
     pub fn new(width: f32, height: f32) -> Self {
         Self {
-            width,
-            height,
+            screen: UIScreen { width, height },
             layouts: Vec::new(),
         }
     }
 
-    pub fn get_width(&self) -> f32 {
-        self.width
+    pub fn get_screen(&self) -> UIScreen {
+        self.screen
     }
 
-    pub fn set_width(&mut self, width: f32) {
-        self.width = width;
-    }
-
-    pub fn get_height(&self) -> f32 {
-        self.height
-    }
-
-    pub fn set_height(&mut self, height: f32) {
-        self.height = height;
+    pub fn set_screen(&mut self, screen: UIScreen) {
+        self.screen = screen;
     }
 
     pub fn root<T: UILayout + 'static>(&mut self, layout: T) -> UITypedLayoutId<T> {
@@ -54,7 +50,7 @@ impl UILayoutManager {
             }
             None => UILayoutResult {
                 pos: [0.0, 0.0],
-                size: [self.width, self.height],
+                size: [self.screen.width, self.screen.height],
             },
         }
     }
@@ -236,8 +232,10 @@ fn layout_manager_test() {
         }
     );
 
-    lm.set_width(50.0);
-    lm.set_height(50.0);
+    lm.set_screen(UIScreen {
+        width: 50.0,
+        height: 50.0,
+    });
 
     assert_eq!(
         lm.layout(Some(upper_right.into())),

@@ -82,12 +82,12 @@ fn main() {
         });
 
         let slider_layout = lm.root(UIRelativeLayout {
-            size: [0.2, 0.1],
-            pos: [0.5, 0.38],
+            size: [0.5, 0.5],
+            pos: [0.0, 0.0],
         });
 
         let button_layout = lm.root(UIRelativeLayout {
-            size: [0.2, 0.1],
+            size: [0.5, 0.5],
             pos: [0.5, 0.5],
         });
 
@@ -160,7 +160,7 @@ fn main() {
                     }
                 }
                 glutin::WindowEvent::CursorMoved { position, .. } => {
-                    let height = state.layout(|lm| lm.get_height());
+                    let height = state.layout(|lm| lm.get_screen().height);
                     state.set_mouse_pos([position.x as f32, height - position.y as f32]);
                 }
                 glutin::WindowEvent::MouseInput {
@@ -180,8 +180,10 @@ fn main() {
                 glutin::WindowEvent::CloseRequested => exit = true,
                 glutin::WindowEvent::Resized(position) => {
                     state.update_layout(|lm| {
-                        lm.set_width(position.width as f32);
-                        lm.set_height(position.height as f32);
+                        lm.set_screen(UIScreen {
+                            width: position.width as f32,
+                            height: position.height as f32,
+                        });
                     });
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {

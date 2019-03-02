@@ -1,4 +1,4 @@
-use crate::ui::layout::UILayoutResult;
+use crate::ui::layout::{UILayoutResult, UIScreen};
 use crate::ui::UIFrameInput;
 use glium::Frame;
 
@@ -29,9 +29,15 @@ impl UIWidgetManager {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, id: UIWidgetId, layout: UILayoutResult) {
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        id: UIWidgetId,
+        layout: UILayoutResult,
+        screen: UIScreen,
+    ) {
         let state = &self.widgets[id.id];
-        state.render(frame, layout);
+        state.render(frame, layout, screen);
     }
 
     pub fn update<T: UIWidget, F: Fn(&mut T)>(&mut self, id: UITypedWidgetId<T>, func: F) {
@@ -59,7 +65,7 @@ impl UIWidgetManager {
 }
 
 trait UIWidgetState {
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult);
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen);
     fn update_input(&mut self, layout: UILayoutResult, frame_input: UIFrameInput);
 }
 
@@ -69,8 +75,8 @@ struct UITypedWidgetState<T: UIWidget> {
 }
 
 impl<T: UIWidget> UIWidgetState for UITypedWidgetState<T> {
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult) {
-        self.widget.render(frame, layout);
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
+        self.widget.render(frame, layout, screen);
     }
 
     fn update_input(&mut self, layout: UILayoutResult, frame_input: UIFrameInput) {
@@ -81,7 +87,7 @@ impl<T: UIWidget> UIWidgetState for UITypedWidgetState<T> {
 
 pub trait UIWidget {
     type Event;
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult);
+    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen);
     fn update_input(
         &mut self,
         _layout: UILayoutResult,
