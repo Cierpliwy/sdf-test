@@ -1,8 +1,7 @@
 use crate::ui::block::{UIBlock, UIBlockContext, UIBlockStyle};
 use crate::ui::label::{UILabel, UILabelAlignment, UILabelContext, UILabelStyle};
-use crate::ui::layout::{UIAbsoluteLayout, UILayout, UILayoutResult, UIScaleLayout, UIScreen};
-use crate::ui::widget::UIWidget;
-use crate::ui::UIFrameInput;
+use crate::ui::layout::{UIAbsoluteLayout, UIScaleLayout};
+use crate::ui::widget::{UIFrameInput, UILayout, UIPoint, UISize, UIWidget};
 use crate::utils::*;
 use glium::Frame;
 use std::cell::RefCell;
@@ -114,19 +113,19 @@ impl UISlider {
         1.0 - (t - 1.0).powf(2.0)
     }
 
-    fn value_from_pos(&self, pos: f32, layout: UILayoutResult) -> f32 {
-        let value = ((pos - layout.pos[0]) / layout.size[0]).max(0.0).min(1.0);
+    fn value_from_pos(&self, pos: f32, layout: UILayout) -> f32 {
+        let value = ((pos - layout.left) / layout.width).max(0.0).min(1.0);
         (value * (self.max_value - self.min_value) / self.step_value + 0.5).floor()
             * self.step_value
             + self.min_value
     }
 
-    fn value_to_pos(&self, value: f32, layout: UILayoutResult) -> f32 {
+    fn value_to_pos(&self, value: f32, layout: UILayout) -> f32 {
         let value = (value / self.step_value + 0.5).floor() * self.step_value;
-        (value - self.min_value) / (self.max_value - self.min_value) * layout.size[0]
+        (value - self.min_value) / (self.max_value - self.min_value) * layout.width
     }
 
-    fn calc_dot_layout(&self, layout: UILayoutResult) -> UILayoutResult {
+    fn calc_dot_layout(&self, layout: UILayout) -> UILayout {
         let dot_size = self.dot.get_style().radius * 2.0;
         let mut value = if let Some(drag_value) = self.drag_value {
             drag_value
@@ -136,17 +135,32 @@ impl UISlider {
         value = self.value_to_pos(value, layout);
 
         let dot_layout = UIAbsoluteLayout {
-            size: [dot_size, dot_size],
-            pos: [value - dot_size / 2.0, (layout.size[1] - dot_size) / 2.0],
+            size: UISize {
+                width: dot_size,
+                height: dot_size,
+            },
+            pos: UIPoint {
+                left: value - dot_size / 2.0,
+                top: (layout.height - dot_size) / 2.0,
+            },
         };
 
         let scale = 1.0 + 0.3 * self.hover_value();
         let scale_layout = UIScaleLayout {
-            scale: [scale, scale],
-            anchor: [0.5, 0.5],
+            scale: UISize {
+                width: scale,
+                height: scale,
+            },
+            anchor: UIPoint {
+                left: 0.5,
+                top: 0.5,
+            },
         };
 
-        scale_layout.layout(dot_layout.layout(layout))
+        let mut result = [UILayout::zero()];
+        dot_layout.layout(layout, &mut result);
+        scale_layout.layout(result[0], &mut result);
+        result[0]
     }
 }
 
@@ -158,12 +172,10 @@ pub enum UISliderEvent {
 impl UIWidget for UISlider {
     type Event = UISliderEvent;
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
-        let UILayoutResult { size, .. } = layout;
-
+    fn render(&self, frame: &mut Frame, layout: UILayout, screen: UISize) {
         // Dot layout
         let dot_layout = self.calc_dot_layout(layout);
-        let center = dot_layout.pos[0] + dot_layout.size[0] / 2.0 - layout.pos[0];
+        let center = dot_layout.left + dot_layout.width / 2.0 - layout.left;
 
         // Background
         let background_style = UIBlockStyle {
@@ -173,12 +185,19 @@ impl UIWidget for UISlider {
         };
         let background_height = background_style.radius * 2.0;
         let background_layout = UIAbsoluteLayout {
-            size: [size[0], background_height],
-            pos: [0.0, (size[1] - background_height) / 2.0],
+            size: UISize {
+                width: layout.width,
+                height: background_height,
+            },
+            pos: UIPoint {
+                left: 0.0,
+                top: (layout.height - background_height) / 2.0,
+            },
         };
-        let background_layout = background_layout.layout(layout);
+        let mut background_layout_result = [UILayout::zero()];
+        background_layout.layout(layout, &mut background_layout_result);
         self.block
-            .render_styled(frame, background_layout, background_style, screen);
+            .render_styled(frame, background_layout_result[0], background_style, screen);
 
         // Dot
         let pressed_value = if self.drag_value.is_some() { 1.0 } else { 0.0 };
@@ -191,18 +210,25 @@ impl UIWidget for UISlider {
 
         // Label
         let label_layout = UIAbsoluteLayout {
-            pos: [0.0, 20.0],
-            size: dot_layout.size,
+            pos: UIPoint {
+                left: 0.0,
+                top: 20.0,
+            },
+            size: UISize {
+                width: dot_layout.width,
+                height: dot_layout.height,
+            },
         };
 
-        self.label
-            .render(frame, label_layout.layout(dot_layout), screen);
+        let mut label_layout_result = [UILayout::zero()];
+        label_layout.layout(dot_layout, &mut label_layout_result);
+        self.label.render(frame, label_layout_result[0], screen);
     }
 
     #[allow(clippy::float_cmp)]
     fn update_input(
         &mut self,
-        layout: UILayoutResult,
+        layout: UILayout,
         frame_input: UIFrameInput,
         events: &mut Vec<UISliderEvent>,
     ) {
@@ -227,7 +253,7 @@ impl UIWidget for UISlider {
         }
 
         if let Some(old_value) = self.drag_value {
-            let new_value = self.value_from_pos(frame_input.mouse_pos[0], layout);
+            let new_value = self.value_from_pos(frame_input.mouse_pos.left, layout);
             if !pressed {
                 self.value = new_value;
                 self.label.set_text(&self.value.to_string());

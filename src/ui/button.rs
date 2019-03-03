@@ -1,8 +1,7 @@
 use crate::ui::block::{UIBlock, UIBlockContext, UIBlockStyle};
 use crate::ui::label::{UILabel, UILabelAlignment, UILabelContext, UILabelStyle};
-use crate::ui::layout::{UILayout, UILayoutResult, UIScaleLayout, UIScreen};
-use crate::ui::widget::UIWidget;
-use crate::ui::UIFrameInput;
+use crate::ui::layout::UIScaleLayout;
+use crate::ui::widget::{UIFrameInput, UILayout, UIPoint, UISize, UIWidget};
 use crate::utils::*;
 use glium::Frame;
 use std::cell::RefCell;
@@ -79,13 +78,21 @@ impl UIButton {
         }
     }
 
-    fn calc_layout(&self, layout: UILayoutResult) -> UILayoutResult {
+    fn calc_layout(&self, layout: UILayout) -> UILayout {
         let scale = 1.0 + 0.1 * self.hover_value();
         let scale_layout = UIScaleLayout {
-            scale: [scale, scale],
-            anchor: [0.5, 0.5],
+            scale: UISize {
+                width: scale,
+                height: scale,
+            },
+            anchor: UIPoint {
+                left: 0.5,
+                top: 0.5,
+            },
         };
-        scale_layout.layout(layout)
+        let mut result = [UILayout::zero()];
+        scale_layout.layout(layout, &mut result);
+        result[0]
     }
 
     fn hover_value(&self) -> f32 {
@@ -102,14 +109,14 @@ pub enum UIButtonEvent {
 impl UIWidget for UIButton {
     type Event = UIButtonEvent;
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
+    fn render(&self, frame: &mut Frame, layout: UILayout, screen: UISize) {
         let scale = 1.0 + 0.1 * self.hover_value();
         let hover_value = self.hover_value();
         let pressed_value = if self.active { 1.0 } else { 0.0 };
         let toggle_value = if self.toggled { 1.0 } else { 0.1 };
 
         let scale_layout = self.calc_layout(layout);
-        let size = scale_layout.size;
+        let size = [scale_layout.width, scale_layout.height];
 
         let style = UIBlockStyle {
             alpha: 0.95,
@@ -144,7 +151,7 @@ impl UIWidget for UIButton {
 
     fn update_input(
         &mut self,
-        layout: UILayoutResult,
+        layout: UILayout,
         frame_input: UIFrameInput,
         events: &mut Vec<UIButtonEvent>,
     ) {

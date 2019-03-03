@@ -11,7 +11,7 @@ use crate::ui::button::*;
 use crate::ui::label::*;
 use crate::ui::layout::*;
 use crate::ui::slider::*;
-use crate::ui::*;
+use crate::ui::widget::*;
 use crate::utils::*;
 
 use glium::{glutin, Surface};
@@ -33,7 +33,10 @@ fn main() {
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
     // Create state
-    let mut state = UIState::new(screen_dim[0], screen_dim[1]);
+    let mut manager = UIWidgetManager::new(UISize {
+        width: screen_dim[0],
+        height: screen_dim[1],
+    });
 
     // Create UI contexts
     let block_context = Rc::new(UIBlockContext::new(&display));
@@ -56,48 +59,73 @@ fn main() {
     ));
 
     // Create UI elements
-    let (label, slider, button) = state.update_widget(|wm| {
-        let label = wm.create(UILabel::new(
-            label_context.clone(),
-            "Trademark(R)",
-            UILabelStyle {
-                size: 20.0,
-                align: UILabelAlignment::Left,
-                color: [1.0, 1.0, 1.0, 1.0],
-                shadow_color: [0.0, 0.0, 0.0, 1.0],
-            },
-        ));
+    let label = manager.create(UILabel::new(
+        label_context.clone(),
+        "Trademark(R)",
+        UILabelStyle {
+            size: 20.0,
+            align: UILabelAlignment::Left,
+            color: [1.0, 1.0, 1.0, 1.0],
+            shadow_color: [0.0, 0.0, 0.0, 1.0],
+        },
+    ));
 
-        let slider = wm.create(UISlider::new(&slider_context, 100.0, 1000.0, 5.0, 500.0));
-        let button = wm.create(UIButton::new(&button_context, "Show textures"));
-
-        (label, slider, button)
-    });
+    let slider = manager.create(UISlider::new(&slider_context, 100.0, 1000.0, 5.0, 500.0));
+    let button = manager.create(UIButton::new(&button_context, "Show textures"));
 
     // Create screen layout
-    let (label_layout, slider_layout, button_layout) = state.update_layout(|lm| {
-        let label_layout = lm.root(UIRelativeLayout {
-            size: [0.2, 0.4],
-            pos: [0.3, 0.5],
-        });
-
-        let slider_layout = lm.root(UIRelativeLayout {
-            size: [0.5, 0.5],
-            pos: [0.0, 0.0],
-        });
-
-        let button_layout = lm.root(UIRelativeLayout {
-            size: [0.5, 0.5],
-            pos: [0.5, 0.5],
-        });
-
-        (label_layout, slider_layout, button_layout)
+    let main_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 1.0,
+            height: 1.0,
+        },
+        pos: UIPoint {
+            left: 0.0,
+            top: 0.0,
+        },
     });
 
-    // Pin views
-    state.pin_widget(label.into(), label_layout.into());
-    state.pin_widget(slider.into(), slider_layout.into());
-    state.pin_widget(button.into(), button_layout.into());
+    let label_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 0.2,
+            height: 0.4,
+        },
+        pos: UIPoint {
+            left: 0.3,
+            top: 0.5,
+        },
+    });
+
+    let slider_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 0.5,
+            height: 0.5,
+        },
+        pos: UIPoint {
+            left: 0.0,
+            top: 0.0,
+        },
+    });
+
+    let button_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 0.5,
+            height: 0.5,
+        },
+        pos: UIPoint {
+            left: 0.5,
+            top: 0.5,
+        },
+    });
+
+    // Organize views
+    manager.root(main_layout);
+    manager.add_child(main_layout, label_layout);
+    manager.add_child(label_layout, label);
+    manager.add_child(main_layout, slider_layout);
+    manager.add_child(slider_layout, slider);
+    manager.add_child(main_layout, button_layout);
+    manager.add_child(button_layout, button);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -120,11 +148,10 @@ fn main() {
     while !exit {
         // FPS counting
         let avg_fps: f64 = fps_array.iter().sum::<f64>() / fps_array.len() as f64;
-        state.update_widget(|wm| {
-            wm.update(label, |l| {
-                l.set_text(&format!("FPS: {:.2}", avg_fps));
-            })
+        manager.update(label, |l| {
+            l.set_text(&format!("FPS: {:.2}", avg_fps));
         });
+
         if let Some(time) = start_frame_time {
             let fps = 1.0 / time.elapsed_seconds();
             fps_array[fps_index] = fps;
@@ -137,7 +164,7 @@ fn main() {
         target.clear_color(0.02, 0.02, 0.02, 1.0);
 
         // Render UI
-        state.render(&mut target);
+        manager.render(&mut target);
 
         // Vsync
         target.finish().expect("finish failed");
@@ -160,30 +187,31 @@ fn main() {
                     }
                 }
                 glutin::WindowEvent::CursorMoved { position, .. } => {
-                    let height = state.layout(|lm| lm.get_screen().height);
-                    state.set_mouse_pos([position.x as f32, height - position.y as f32]);
+                    let height = manager.get_screen().height;
+                    manager.set_mouse_pos(UIPoint {
+                        left: position.x as f32,
+                        top: height - position.y as f32,
+                    });
                 }
                 glutin::WindowEvent::MouseInput {
                     button: b,
                     state: button_state,
                     ..
                 } => {
-                    state.set_left_mouse_button_pressed(
+                    manager.set_left_mouse_button_pressed(
                         b == glutin::MouseButton::Left
                             && button_state == glutin::ElementState::Pressed,
                     );
-                    state.set_right_mouse_button_pressed(
+                    manager.set_right_mouse_button_pressed(
                         b == glutin::MouseButton::Right
                             && button_state == glutin::ElementState::Pressed,
                     );
                 }
                 glutin::WindowEvent::CloseRequested => exit = true,
                 glutin::WindowEvent::Resized(position) => {
-                    state.update_layout(|lm| {
-                        lm.set_screen(UIScreen {
-                            width: position.width as f32,
-                            height: position.height as f32,
-                        });
+                    manager.set_screen(UISize {
+                        width: position.width as f32,
+                        height: position.height as f32,
                     });
                 }
                 glutin::WindowEvent::ReceivedCharacter(c) => {
@@ -215,14 +243,12 @@ fn main() {
         });
 
         // Handle user events
-        state.update_widget(|wm| {
-            wm.poll_events(button, |e| match e {
-                UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
-            });
-            wm.poll_events(slider, |e| match e {
-                UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
-                UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
-            })
+        manager.poll_events(button, |e| match e {
+            UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
+        });
+        manager.poll_events(slider, |e| match e {
+            UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
+            UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
         });
     }
 

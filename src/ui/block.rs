@@ -1,5 +1,4 @@
-use crate::ui::layout::{UILayoutResult, UIScreen};
-use crate::ui::widget::UIWidget;
+use crate::ui::widget::{UILayout, UISize, UIWidget};
 use glium::backend::Facade;
 use glium::draw_parameters::DrawParameters;
 use glium::index::PrimitiveType;
@@ -144,13 +143,12 @@ impl UIBlock {
     pub fn render_styled(
         &self,
         frame: &mut Frame,
-        layout: UILayoutResult,
+        layout: UILayout,
         style: UIBlockStyle,
-        screen: UIScreen,
+        screen: UISize,
     ) {
-        let UILayoutResult { size, pos } = layout;
         let screen = [screen.width, screen.height];
-        let limit = size[0].min(size[1]) / 2.0;
+        let limit = layout.width.min(layout.height) / 2.0;
 
         frame
             .draw(
@@ -161,9 +159,9 @@ impl UIBlock {
                     uAlpha: style.alpha,
                     uRadius: style.radius.min(limit),
                     uSharpness: style.sharpness.min(limit),
-                    uSize: size,
+                    uSize: [layout.width, layout.height],
                     uScreen: screen,
-                    uPosition: pos,
+                    uPosition: [layout.left, layout.top],
                     uLeftOffset: style.left_offset,
                     uLeftColor: style.left_color,
                     uRightOffset: style.right_offset,
@@ -184,7 +182,7 @@ impl UIBlock {
 impl UIWidget for UIBlock {
     type Event = ();
 
-    fn render(&self, frame: &mut Frame, layout: UILayoutResult, screen: UIScreen) {
+    fn render(&self, frame: &mut Frame, layout: UILayout, screen: UISize) {
         self.render_styled(frame, layout, self.style, screen);
     }
 }
