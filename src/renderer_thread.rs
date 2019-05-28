@@ -12,12 +12,12 @@ pub struct RendererContext {
 }
 
 pub enum RendererCommand {
-    RenderShapes(TextureRenderBatch),
+    RenderShapes(String, TextureRenderBatch),
     Exit,
 }
 
 pub enum RendererResult {
-    ShapesRendered(TextureRenderBatch),
+    ShapesRendered(String, TextureRenderBatch),
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -26,28 +26,29 @@ pub fn renderer_entry_point(context: RendererContext) -> Result<(), RecvError> {
     loop {
         let command = context.receiver.recv()?;
         match command {
-            RendererCommand::RenderShapes(mut batch) => {
+            RendererCommand::RenderShapes(name, mut batch) => {
                 {
                     let mut texture_mutex = batch.texture.lock().unwrap();
                     let render_time = Instant::now();
 
                     let texture_lock = texture_mutex.lock();
 
-                    println!("Rendering {} shape(s)...", batch.allocated_shapes.len());
+                    println!("Rendering {} shape(s) for {}...", batch.allocated_shapes.len(), name);
 
                     batch.allocated_shapes.par_iter_mut().for_each(|shape| {
                         render_shape(shape, &texture_lock);
                     });
 
                     println!(
-                        "Finished rendering {} shape(s) in {:?}.",
+                        "Finished rendering {} shape(s) in {:?} for {}.",
                         batch.allocated_shapes.len(),
-                        render_time.elapsed()
+                        render_time.elapsed(),
+                        name
                     );
                 }
                 context
                     .sender
-                    .send(RendererResult::ShapesRendered(batch))
+                    .send(RendererResult::ShapesRendered(name, batch))
                     .unwrap_or_else(|_| {
                         println!("Coudn't send rendered shapes result");
                     })

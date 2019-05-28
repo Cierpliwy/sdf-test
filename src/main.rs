@@ -11,6 +11,7 @@ use crate::ui::button::*;
 use crate::ui::label::*;
 use crate::ui::layout::*;
 use crate::ui::slider::*;
+use crate::ui::text_area::*;
 use crate::ui::widget::*;
 use crate::utils::*;
 
@@ -57,6 +58,15 @@ fn main() {
         block_context.clone(),
         label_context.clone(),
     ));
+    let font2 = Font::new(
+        1024,
+        1024,
+        32,
+        8,
+        (&include_bytes!("../assets/monserat.ttf")[..]).into(),
+    )
+    .expect("Cannot load TextArea font");
+    let text_area_context = Rc::new(RefCell::new(UITextAreaContext::new(&display, font2)));
 
     // Create UI elements
     let label = manager.create(UILabel::new(
@@ -69,9 +79,20 @@ fn main() {
             shadow_color: [0.0, 0.0, 0.0, 1.0],
         },
     ));
-
     let slider = manager.create(UISlider::new(&slider_context, 100.0, 1000.0, 5.0, 500.0));
     let button = manager.create(UIButton::new(&button_context, "Show textures"));
+    let text_area = manager.create(UITextArea::new(
+        text_area_context.clone(),
+        "In this video, we avoid telling the creatures what their survival chances are and let them figure it out themselves. This is the fifth in the series on evolution.\nPrzemysław Lenart",
+        UITextAreaStyle {
+            text_size: 40.0,
+            inner_dist: 0.0,
+            outer_dist: 1.0,
+            shadow_dist: 1.1,
+            text_color: Color::new(1.0, 0.3, 0.4),
+            shadow_color: Color::new(0.8, 0.4, 0.8),
+        },
+    ));
 
     // Create screen layout
     let main_layout = manager.create(UIRelativeLayout {
@@ -118,6 +139,17 @@ fn main() {
         },
     });
 
+    let text_area_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 0.5,
+            height: 0.5,
+        },
+        pos: UIPoint {
+            left: 0.5,
+            top: 1.0,
+        },
+    });
+
     // Organize views
     manager.root(main_layout);
     manager.add_child(main_layout, label_layout);
@@ -126,6 +158,8 @@ fn main() {
     manager.add_child(slider_layout, slider);
     manager.add_child(main_layout, button_layout);
     manager.add_child(button_layout, button);
+    manager.add_child(main_layout, text_area_layout);
+    manager.add_child(text_area_layout, text_area);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -173,7 +207,15 @@ fn main() {
         {
             for batch in label_context.borrow_mut().get_texture_render_batches() {
                 renderer_command_sender
-                    .send(RendererCommand::RenderShapes(batch))
+                    .send(RendererCommand::RenderShapes("label_context".into(), batch))
+                    .expect("Cannot send render shapes to the renderer");
+            }
+            for batch in text_area_context.borrow_mut().get_texture_render_batches() {
+                renderer_command_sender
+                    .send(RendererCommand::RenderShapes(
+                        "text_area_context".into(),
+                        batch,
+                    ))
                     .expect("Cannot send render shapes to the renderer");
             }
         }
@@ -225,14 +267,23 @@ fn main() {
                 let result = renderer_result_receiver.try_recv();
                 if let Ok(result) = result {
                     match result {
-                        RendererResult::ShapesRendered(batch) => {
+                        RendererResult::ShapesRendered(name, batch) => {
                             let texture = batch.texture.lock().unwrap();
                             let texture_upload_time = Instant::now();
 
-                            label_context
-                                .borrow_mut()
-                                .update_texture_cache(batch.texture_id, &texture)
-                                .expect("Coudn't upload texture to label context");
+                            if name == "label_context" {
+                                label_context
+                                    .borrow_mut()
+                                    .update_texture_cache(batch.texture_id, &texture)
+                                    .expect("Coudn't upload texture to label context");
+                            }
+
+                            if name == "text_area_context" {
+                                text_area_context
+                                    .borrow_mut()
+                                    .update_texture_cache(batch.texture_id, &texture)
+                                    .expect("Couldn't upload texture to text area context");
+                            }
 
                             println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
                         }
