@@ -165,6 +165,24 @@ impl Font {
         self.font_size
     }
 
+    pub fn get_ascent(&self) -> f32 {
+        let scale = Scale::uniform(1.0);
+        let v_metrics = self.font.v_metrics(scale);
+        v_metrics.ascent
+    }
+
+    pub fn get_descent(&self) -> f32 {
+        let scale = Scale::uniform(1.0);
+        let v_metrics = self.font.v_metrics(scale);
+        v_metrics.descent
+    }
+
+    pub fn get_line_gap(&self) -> f32 {
+        let scale = Scale::uniform(1.0);
+        let v_metrics = self.font.v_metrics(scale);
+        v_metrics.line_gap
+    }
+
     pub fn get_texture_render_batches(&mut self) -> Vec<TextureRenderBatch> {
         let mut batches = Vec::new();
 

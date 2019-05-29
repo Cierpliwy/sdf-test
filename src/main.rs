@@ -85,7 +85,7 @@ fn main() {
         text_area_context.clone(),
         "In this video, we avoid telling the creatures what their survival chances are and let them figure it out themselves. This is the fifth in the series on evolution.\nPrzemysław Lenart",
         UITextAreaStyle {
-            text_size: 40.0,
+            text_size: 20.0,
             inner_dist: 0.0,
             outer_dist: 1.0,
             shadow_dist: 1.1,
@@ -130,8 +130,8 @@ fn main() {
 
     let button_layout = manager.create(UIRelativeLayout {
         size: UISize {
-            width: 0.5,
-            height: 0.5,
+            width: 0.2,
+            height: 0.3,
         },
         pos: UIPoint {
             left: 0.5,
@@ -141,12 +141,12 @@ fn main() {
 
     let text_area_layout = manager.create(UIRelativeLayout {
         size: UISize {
-            width: 0.5,
-            height: 0.5,
+            width: 0.2,
+            height: 0.3,
         },
         pos: UIPoint {
             left: 0.5,
-            top: 1.0,
+            top: 0.5,
         },
     });
 

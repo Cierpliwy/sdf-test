@@ -1,4 +1,4 @@
-use crate::ui::widget::{UILayout, UISize, UIWidget};
+use crate::ui::widget::{UIFrameInput, UILayout, UISize, UIWidget};
 use glium::backend::{Context, Facade};
 use glium::draw_parameters::DrawParameters;
 use glium::index::PrimitiveType;
@@ -51,8 +51,6 @@ impl AsUniformValue for Color {
         UniformValue::Vec4([self.r, self.g, self.b, 1.0])
     }
 }
-
-// impl uniform::AsUniform
 
 #[derive(Clone, Copy, Debug)]
 pub struct UITextAreaStyle {
@@ -213,9 +211,10 @@ struct UITextAreaRenderPass {
 
 pub struct UITextArea {
     style: UITextAreaStyle,
-    bounding_box: Rect<f32>,
     passes: HashMap<u32, UITextAreaRenderPass>,
     context: Rc<RefCell<UITextAreaContext>>,
+    last_size: UISize,
+    last_text: String,
 }
 
 impl UITextArea {
@@ -224,15 +223,13 @@ impl UITextArea {
         text: &str,
         style: UITextAreaStyle,
     ) -> Self {
-        let mut text_area = Self {
+        Self {
             context,
-            bounding_box: Rect::new(0.0, 0.0, 0.0, 0.0),
+            last_size: UISize::zero(),
+            last_text: text.into(),
             passes: HashMap::new(),
             style,
-        };
-
-        text_area.set_text(text);
-        text_area
+        }
     }
 
     pub fn get_style(&self) -> UITextAreaStyle {
@@ -243,18 +240,7 @@ impl UITextArea {
         self.style = style;
     }
 
-    pub fn get_bounding_box(&self, style: UITextAreaStyle) -> Rect<f32> {
-        let bb = self.bounding_box;
-        let size = style.text_size;
-        Rect::new(
-            bb.min.x * size,
-            bb.min.y * size,
-            bb.max.x * size,
-            bb.max.y * size,
-        )
-    }
-
-    pub fn set_text(&mut self, text: &str) {
+    fn layout_text(&mut self) {
         let mut context = self.context.borrow_mut();
 
         enum FormattedText<'a> {
@@ -279,8 +265,11 @@ impl UITextArea {
             passes: HashMap<u32, PassData>,
         };
 
-        let line_height = 1.0;
-        let line_max_width = 15.0;
+        let line_gap = context.font.get_line_gap();
+        let ascent = context.font.get_ascent();
+        let descent = context.font.get_descent();
+        let line_height = line_gap + ascent - descent;
+        let line_max_width = self.last_size.width / self.style.text_size;
         let line_min_space = 0.3;
 
         let mut render_word_ctx = RenderWordContext {
@@ -325,7 +314,7 @@ impl UITextArea {
             }
         };
 
-        let mut process_line = |text_ctx: &mut ProcessTextCtx, align: bool| {
+        let mut layout_line = |text_ctx: &mut ProcessTextCtx, align: bool| {
             let word_count = text_ctx.line_words.len();
             if word_count == 0 {
                 return;
@@ -348,7 +337,7 @@ impl UITextArea {
         };
 
         let mut process_text_ctx = ProcessTextCtx {
-            line_y: 0.0,
+            line_y: -ascent,
             line_total_space: 0.0,
             line_word_space: 0.0,
             line_words: VecDeque::new(),
@@ -358,11 +347,11 @@ impl UITextArea {
             let mut ctx = &mut process_text_ctx;
             match formatted_text {
                 FormattedText::End => {
-                    process_line(ctx, false);
+                    layout_line(ctx, false);
                 }
                 FormattedText::NewLine => {
-                    process_line(ctx, false);
-                    ctx.line_y += line_height
+                    layout_line(ctx, false);
+                    ctx.line_y -= line_height
                 }
                 FormattedText::Word(word) => {
                     let word_layout = context.font.layout_text_block(word);
@@ -371,8 +360,8 @@ impl UITextArea {
                         ctx.line_total_space += word_width + line_min_space;
                         ctx.line_word_space += word_width;
                     } else {
-                        process_line(ctx, true);
-                        ctx.line_y += line_height;
+                        layout_line(ctx, true);
+                        ctx.line_y -= line_height;
                         ctx.line_total_space = word_width + line_min_space;
                         ctx.line_word_space = word_width;
                     }
@@ -383,18 +372,18 @@ impl UITextArea {
 
         let mut format_text = || {
             let mut word_start = None;
-            for (index, character) in text.char_indices() {
+            for (index, character) in self.last_text.char_indices() {
                 match character {
                     '\n' => {
                         if let Some(start) = word_start {
-                            process_text(FormattedText::Word(&text[start..index]));
+                            process_text(FormattedText::Word(&self.last_text[start..index]));
                             word_start = None;
                         }
                         process_text(FormattedText::NewLine);
                     }
                     x if x.is_whitespace() => {
                         if let Some(start) = word_start {
-                            process_text(FormattedText::Word(&text[start..index]));
+                            process_text(FormattedText::Word(&self.last_text[start..index]));
                             word_start = None;
                         }
                     }
@@ -407,7 +396,9 @@ impl UITextArea {
             }
 
             if let Some(start) = word_start {
-                process_text(FormattedText::Word(&text[start..text.len()]));
+                process_text(FormattedText::Word(
+                    &self.last_text[start..self.last_text.len()],
+                ));
             }
 
             process_text(FormattedText::End);
@@ -448,7 +439,7 @@ impl UITextArea {
         style: UITextAreaStyle,
         screen: UISize,
     ) {
-        let mut pos = [layout.left, layout.top - layout.height];
+        let mut pos = [layout.left, layout.top + layout.height];
         let size = [layout.width, layout.height];
         let screen = [screen.width, screen.height];
 
@@ -492,5 +483,20 @@ impl UIWidget for UITextArea {
 
     fn render(&self, frame: &mut Frame, layout: UILayout, screen: UISize) {
         self.render_styled(frame, layout, self.style, screen)
+    }
+
+    fn update_input(
+        &mut self,
+        layout: UILayout,
+        _frame_input: UIFrameInput,
+        _events: &mut Vec<Self::Event>,
+    ) {
+        if layout.width != self.last_size.width || layout.height != self.last_size.height {
+            self.last_size = UISize {
+                width: layout.width,
+                height: layout.height,
+            };
+            self.layout_text();
+        }
     }
 }
