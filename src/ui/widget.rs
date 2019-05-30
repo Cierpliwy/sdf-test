@@ -27,6 +27,7 @@ pub struct UIFrameInput {
     pub mouse_pos: UIPoint,
     pub left_mouse_button_pressed: bool,
     pub right_mouse_button_pressed: bool,
+    pub mouse_wheel_delta: Option<f32>,
 }
 
 impl UIPoint {
@@ -80,6 +81,7 @@ impl UIFrameInput {
             mouse_pos: UIPoint::zero(),
             left_mouse_button_pressed: false,
             right_mouse_button_pressed: false,
+            mouse_wheel_delta: None,
         }
     }
 }
@@ -230,6 +232,10 @@ impl UIWidgetManager {
         self.frame_input.right_mouse_button_pressed = pressed;
     }
 
+    pub fn set_mouse_wheel_delta(&mut self, delta: Option<f32>) {
+        self.frame_input.mouse_wheel_delta = delta;
+    }
+
     pub fn create<T: UIWidget + 'static>(&mut self, widget: T) -> UITypedWidgetId<T> {
         let id = self.widgets.len();
         let mut data = Box::new(UITypedWidgetData {
@@ -248,11 +254,15 @@ impl UIWidgetManager {
         }
     }
 
-    pub fn update<T: UIWidget, F: Fn(&mut T)>(&mut self, id: UITypedWidgetId<T>, func: F) {
+    pub fn update<T: UIWidget, F: FnMut(&mut T)>(&mut self, id: UITypedWidgetId<T>, mut func: F) {
         func(unsafe { &mut (*id.ptr).widget });
     }
 
-    pub fn poll_events<T: UIWidget, F: Fn(&T::Event)>(&mut self, id: UITypedWidgetId<T>, func: F) {
+    pub fn poll_events<T: UIWidget, F: FnMut(&T::Event)>(
+        &mut self,
+        id: UITypedWidgetId<T>,
+        mut func: F,
+    ) {
         let state: &mut UITypedWidgetData<T> = unsafe { &mut *id.ptr };
         for e in &state.events {
             func(&e);

@@ -61,105 +61,159 @@ fn main() {
     let font2 = Font::new(
         1024,
         1024,
-        32,
-        8,
+        64,
+        16,
         (&include_bytes!("../assets/monserat.ttf")[..]).into(),
     )
     .expect("Cannot load TextArea font");
     let text_area_context = Rc::new(RefCell::new(UITextAreaContext::new(&display, font2)));
 
     // Create UI elements
-    let label = manager.create(UILabel::new(
-        label_context.clone(),
-        "Trademark(R)",
-        UILabelStyle {
-            size: 20.0,
-            align: UILabelAlignment::Left,
-            color: [1.0, 1.0, 1.0, 1.0],
-            shadow_color: [0.0, 0.0, 0.0, 1.0],
-        },
-    ));
-    let slider = manager.create(UISlider::new(&slider_context, 100.0, 1000.0, 5.0, 500.0));
-    let button = manager.create(UIButton::new(&button_context, "Show textures"));
+
+    let mut text_style = UITextAreaStyle {
+        text_size: 40.0,
+        inner_dist: 0.0,
+        outer_dist: 1.0,
+        shadow_dist: 1.1,
+        text_color: Color::new(1.0, 0.3, 0.4),
+        shadow_color: Color::new(0.8, 0.4, 0.8),
+    };
+
     let text_area = manager.create(UITextArea::new(
         text_area_context.clone(),
-        "In this video, we avoid telling the creatures what their survival chances are and let them figure it out themselves. This is the fifth in the series on evolution.\nPrzemysław Lenart",
-        UITextAreaStyle {
-            text_size: 20.0,
-            inner_dist: 0.0,
-            outer_dist: 1.0,
-            shadow_dist: 1.1,
-            text_color: Color::new(1.0, 0.3, 0.4),
-            shadow_color: Color::new(0.8, 0.4, 0.8),
+        "Welcome to the SDF font demo!\n\nYou can use left menu to adjust font and texture settings. Move text and zoom it with touchpad and type anything which you want :)\n\nPrzemysław Lenart",
+       text_style
+    ));
+
+    let label_style = UILabelStyle {
+        size: 20.0,
+        align: UILabelAlignment::Center,
+        color: [1.0, 1.0, 1.0, 1.0],
+        shadow_color: [0.0, 0.0, 0.0, 1.0],
+    };
+    let drawer_block = manager.create(UIBlock::new(
+        block_context.clone(),
+        UIBlockStyle {
+            alpha: 0.99,
+            radius: 15.0,
+            sharpness: 1.0,
+            left_offset: 0.0,
+            left_color: [0.015, 0.015, 0.015],
+            right_offset: 0.0,
+            right_color: [0.015, 0.015, 0.015],
+            inner_shadow: 30.0,
+            shade_color: [0.005, 0.005, 0.005],
         },
     ));
 
+    let red_label = manager.create(UILabel::new(
+        label_context.clone(),
+        "red",
+        UILabelStyle {
+            color: [0.988, 0.576, 0.576, 1.0],
+            ..label_style
+        },
+    ));
+    let red_slider = manager.create(UISlider::new(
+        &slider_context,
+        0.0,
+        1.0,
+        1.0 / 256.0,
+        text_style.text_color.r,
+    ));
+
+    let green_label = manager.create(UILabel::new(
+        label_context.clone(),
+        "green",
+        UILabelStyle {
+            color: [0.735, 0.941, 0.724, 1.0],
+            ..label_style
+        },
+    ));
+    let green_slider = manager.create(UISlider::new(
+        &slider_context,
+        0.0,
+        1.0,
+        1.0 / 256.0,
+        text_style.text_color.g,
+    ));
+
+    let blue_label = manager.create(UILabel::new(
+        label_context.clone(),
+        "blue",
+        UILabelStyle {
+            color: [0.716, 0.708, 0.933, 1.0],
+            ..label_style
+        },
+    ));
+
+    let blue_slider = manager.create(UISlider::new(
+        &slider_context,
+        0.0,
+        1.0,
+        1.0 / 256.0,
+        text_style.text_color.b,
+    ));
+
+    let inner_label = manager.create(UILabel::new(
+        label_context.clone(),
+        "inner distance",
+        label_style,
+    ));
+    let outer_label = manager.create(UILabel::new(
+        label_context.clone(),
+        "outer distance",
+        label_style,
+    ));
+
     // Create screen layout
-    let main_layout = manager.create(UIRelativeLayout {
+    let main_layout = manager.create(UIMainLayout {
+        padding: 20.0,
+        min_width: 150.0,
+        max_width: 300.0,
+        ratio: 0.3,
+    });
+
+    let drawer_layout = manager.create(UIRelativeLayout {
         size: UISize {
             width: 1.0,
             height: 1.0,
         },
         pos: UIPoint {
-            left: 0.0,
-            top: 0.0,
+            left: 0.00,
+            top: 0.00,
         },
     });
 
-    let label_layout = manager.create(UIRelativeLayout {
-        size: UISize {
-            width: 0.2,
-            height: 0.4,
-        },
-        pos: UIPoint {
-            left: 0.3,
-            top: 0.5,
-        },
+    let vbox_layout = manager.create(UIVBoxLayout {
+        min_height: 30.0,
+        max_height: 50.0,
+        padding: 20.0,
     });
 
-    let slider_layout = manager.create(UIRelativeLayout {
-        size: UISize {
-            width: 0.5,
-            height: 0.5,
-        },
-        pos: UIPoint {
-            left: 0.0,
-            top: 0.0,
-        },
-    });
-
-    let button_layout = manager.create(UIRelativeLayout {
-        size: UISize {
-            width: 0.2,
-            height: 0.3,
-        },
-        pos: UIPoint {
-            left: 0.5,
-            top: 0.5,
-        },
-    });
-
-    let text_area_layout = manager.create(UIRelativeLayout {
-        size: UISize {
-            width: 0.2,
-            height: 0.3,
-        },
-        pos: UIPoint {
-            left: 0.5,
-            top: 0.5,
-        },
-    });
+    let slider_layout = UISliderLayout { label_offset: 20.0 };
+    let red_layout = manager.create(slider_layout);
+    let green_layout = manager.create(slider_layout);
+    let blue_layout = manager.create(slider_layout);
 
     // Organize views
     manager.root(main_layout);
-    manager.add_child(main_layout, label_layout);
-    manager.add_child(label_layout, label);
-    manager.add_child(main_layout, slider_layout);
-    manager.add_child(slider_layout, slider);
-    manager.add_child(main_layout, button_layout);
-    manager.add_child(button_layout, button);
-    manager.add_child(main_layout, text_area_layout);
-    manager.add_child(text_area_layout, text_area);
+    manager.add_child(main_layout, drawer_layout);
+    manager.add_child(drawer_layout, drawer_block);
+    manager.add_child(main_layout, text_area);
+
+    manager.add_child(drawer_layout, vbox_layout);
+    manager.add_child(vbox_layout, red_layout);
+    manager.add_child(vbox_layout, green_layout);
+    manager.add_child(vbox_layout, blue_layout);
+
+    manager.add_child(red_layout, red_slider);
+    manager.add_child(red_layout, red_label);
+    manager.add_child(green_layout, green_slider);
+    manager.add_child(green_layout, green_label);
+    manager.add_child(blue_layout, blue_slider);
+    manager.add_child(blue_layout, blue_label);
+
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -182,9 +236,9 @@ fn main() {
     while !exit {
         // FPS counting
         let avg_fps: f64 = fps_array.iter().sum::<f64>() / fps_array.len() as f64;
-        manager.update(label, |l| {
-            l.set_text(&format!("FPS: {:.2}", avg_fps));
-        });
+        // manager.update(label, |l| {
+        //     l.set_text(&format!("FPS: {:.2}", avg_fps));
+        // });
 
         if let Some(time) = start_frame_time {
             let fps = 1.0 / time.elapsed_seconds();
@@ -192,6 +246,11 @@ fn main() {
             fps_index = (fps_index + 1) % fps_array.len();
         }
         start_frame_time = Some(Instant::now());
+
+        // Update widgets
+        manager.update(text_area, |t| {
+            t.set_style(text_style);
+        });
 
         // Draw scene
         let mut target = display.draw();
@@ -221,6 +280,7 @@ fn main() {
         }
 
         // Handle window events
+        manager.set_mouse_wheel_delta(None);
         events_loop.poll_events(|event| match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::KeyboardInput { input, .. } => {
@@ -234,6 +294,13 @@ fn main() {
                         left: position.x as f32,
                         top: height - position.y as f32,
                     });
+                }
+                glutin::WindowEvent::MouseWheel { delta, .. } => {
+                    let value = match delta {
+                        glutin::MouseScrollDelta::LineDelta(_, y) => y,
+                        glutin::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
+                    };
+                    manager.set_mouse_wheel_delta(Some(value));
                 }
                 glutin::WindowEvent::MouseInput {
                     button: b,
@@ -294,13 +361,46 @@ fn main() {
         });
 
         // Handle user events
-        manager.poll_events(button, |e| match e {
-            UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
+        manager.poll_events(red_slider, |e| {
+            let value = match e {
+                UISliderEvent::ValueChanged(v) => v,
+                UISliderEvent::ValueFinished(v) => v,
+            };
+            text_style = UITextAreaStyle {
+                text_color: Color::new(*value, text_style.text_color.g, text_style.text_color.b),
+                ..text_style
+            };
         });
-        manager.poll_events(slider, |e| match e {
-            UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
-            UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
+
+        manager.poll_events(green_slider, |e| {
+            let value = match e {
+                UISliderEvent::ValueChanged(v) => v,
+                UISliderEvent::ValueFinished(v) => v,
+            };
+            text_style = UITextAreaStyle {
+                text_color: Color::new(text_style.text_color.r, *value, text_style.text_color.b),
+                ..text_style
+            };
         });
+
+        manager.poll_events(blue_slider, |e| {
+            let value = match e {
+                UISliderEvent::ValueChanged(v) => v,
+                UISliderEvent::ValueFinished(v) => v,
+            };
+            text_style = UITextAreaStyle {
+                text_color: Color::new(text_style.text_color.r, text_style.text_color.g, *value),
+                ..text_style
+            };
+        });
+
+        // manager.poll_events(button, |e| match e {
+        //     UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
+        // });
+        // manager.poll_events(slider, |e| match e {
+        //     UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
+        //     UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
+        // });
     }
 
     renderer_command_sender

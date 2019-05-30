@@ -1,4 +1,4 @@
-use crate::ui::widget::{UIFrameInput, UILayout, UISize, UIWidget};
+use crate::ui::widget::{UIFrameInput, UILayout, UIPoint, UISize, UIWidget};
 use glium::backend::{Context, Facade};
 use glium::draw_parameters::DrawParameters;
 use glium::index::PrimitiveType;
@@ -9,7 +9,6 @@ use glium::{
     Surface, VertexBuffer,
 };
 use sdf::font::{Font, TextBlockLayout, TextureRenderBatch};
-use sdf::geometry::Rect;
 use sdf::texture::Texture;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -215,6 +214,10 @@ pub struct UITextArea {
     context: Rc<RefCell<UITextAreaContext>>,
     last_size: UISize,
     last_text: String,
+    offset: UIPoint,
+    drag_offset: UIPoint,
+    drag_start: Option<UIPoint>,
+    zoom: f32,
 }
 
 impl UITextArea {
@@ -227,6 +230,10 @@ impl UITextArea {
             context,
             last_size: UISize::zero(),
             last_text: text.into(),
+            offset: UIPoint::zero(),
+            drag_offset: UIPoint::zero(),
+            drag_start: None,
+            zoom: 1.0,
             passes: HashMap::new(),
             style,
         }
@@ -439,7 +446,10 @@ impl UITextArea {
         style: UITextAreaStyle,
         screen: UISize,
     ) {
-        let mut pos = [layout.left, layout.top + layout.height];
+        let pos = [
+            layout.left + self.offset.left + self.drag_offset.left,
+            layout.top + layout.height + self.offset.top + self.drag_offset.top,
+        ];
         let size = [layout.width, layout.height];
         let screen = [screen.width, screen.height];
 
@@ -447,8 +457,9 @@ impl UITextArea {
         let shadow_size = context.font.get_shadow_size();
         let font_size = context.font.get_font_size();
         let font_sharpness = 0.4;
-        let sharpness =
-            font_sharpness / f32::from(shadow_size) / (style.text_size / f32::from(font_size));
+        let sharpness = font_sharpness
+            / f32::from(shadow_size)
+            / (style.text_size * self.zoom / f32::from(font_size));
 
         for (texture_id, pass_data) in &self.passes {
             if let Some(texture) = context.get_texture(*texture_id) {
@@ -460,7 +471,7 @@ impl UITextArea {
                         &uniform! {
                             uTexture: texture,
                             uSharpness: sharpness,
-                            uFontSize: style.text_size,
+                            uFontSize: style.text_size * self.zoom,
                             uPosition: pos,
                             uScreen: screen,
                             uColor: style.text_color,
@@ -488,7 +499,7 @@ impl UIWidget for UITextArea {
     fn update_input(
         &mut self,
         layout: UILayout,
-        _frame_input: UIFrameInput,
+        frame_input: UIFrameInput,
         _events: &mut Vec<Self::Event>,
     ) {
         if layout.width != self.last_size.width || layout.height != self.last_size.height {
@@ -497,6 +508,42 @@ impl UIWidget for UITextArea {
                 height: layout.height,
             };
             self.layout_text();
+        }
+
+        let left = frame_input.mouse_pos.left - layout.left;
+        let top = frame_input.mouse_pos.top - layout.top - layout.height;
+
+        if let Some(drag_start) = self.drag_start {
+            if !frame_input.left_mouse_button_pressed {
+                self.drag_start = None;
+                self.offset = UIPoint {
+                    left: self.offset.left + left - drag_start.left,
+                    top: self.offset.top + top - drag_start.top,
+                };
+                self.drag_offset = UIPoint::zero();
+            } else {
+                self.drag_offset = UIPoint {
+                    left: left - drag_start.left,
+                    top: top - drag_start.top,
+                };
+            }
+        } else if layout.is_inside(frame_input.mouse_pos) {
+            if frame_input.left_mouse_button_pressed {
+                self.drag_start = Some(UIPoint { left, top });
+            }
+
+            if let Some(mouse_wheel_delta) = frame_input.mouse_wheel_delta {
+                let new_zoom = (self.zoom + mouse_wheel_delta / 100.0 * self.zoom)
+                    .max(1.0 / 8.0)
+                    .min(128.0);
+                let new_offset_left = left - (left - self.offset.left) * (new_zoom / self.zoom);
+                let new_offset_top = top - (top - self.offset.top) * (new_zoom / self.zoom);
+                self.zoom = new_zoom;
+                self.offset = UIPoint {
+                    left: new_offset_left,
+                    top: new_offset_top,
+                };
+            }
         }
     }
 }

@@ -81,7 +81,7 @@ impl UISlider {
 
         let label = UILabel::new(
             context.label_context.clone(),
-            &format!("{}", value),
+            &format!("{:.2}", value),
             UILabelStyle {
                 size: 15.0,
                 align: UILabelAlignment::Center,
@@ -256,13 +256,13 @@ impl UIWidget for UISlider {
             let new_value = self.value_from_pos(frame_input.mouse_pos.left, layout);
             if !pressed {
                 self.value = new_value;
-                self.label.set_text(&self.value.to_string());
+                self.label.set_text(&format!("{:.2}", self.value));
                 self.drag_value = None;
                 events.push(UISliderEvent::ValueFinished(new_value));
             } else {
                 if old_value != new_value {
                     events.push(UISliderEvent::ValueChanged(new_value));
-                    self.label.set_text(&new_value.to_string());
+                    self.label.set_text(&format!("{:.2}", new_value));
                 }
                 self.drag_value = Some(new_value);
             }
