@@ -104,7 +104,8 @@ impl UIWidget for UIMainLayout {
 
 #[derive(Copy, Clone)]
 pub struct UIVBoxLayout {
-    pub padding: f32,
+    pub hpadding: f32,
+    pub vpadding: f32,
     pub min_height: f32,
     pub max_height: f32,
 }
@@ -112,16 +113,16 @@ pub struct UIVBoxLayout {
 impl UIWidget for UIVBoxLayout {
     type Event = ();
     fn layout(&self, layout: UILayout, children: &mut [UILayout]) {
-        let height = ((layout.height - (children.len() - 1) as f32 * self.padding)
+        let height = ((layout.height - (children.len() - 1) as f32 * self.vpadding)
             / children.len() as f32)
             .min(self.max_height)
             .max(self.min_height);
 
         for (index, child) in children.iter_mut().enumerate() {
-            child.left = layout.left + self.padding;
-            child.width = layout.width - self.padding * 2.0;
+            child.left = layout.left + self.hpadding;
+            child.width = layout.width - self.hpadding * 2.0;
             child.height = height;
-            child.top = layout.top + layout.height - (index as f32 + 1.0) * (self.padding + height);
+            child.top = layout.top + layout.height - (index as f32 + 1.0) * (self.vpadding + height);
         }
     }
 }

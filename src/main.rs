@@ -74,9 +74,18 @@ fn main() {
     // Prepare UI elements styles and common functions.
     let label_style = UILabelStyle {
         size: 16.0,
+        align: UILabelAlignment::Left,
+        color: [1.0, 1.0, 1.0, 1.0],
+        shadow_color: [0.0, 0.0, 0.0, 1.0],
+        opacity: 1.0
+    };
+
+    let titile_label_style = UILabelStyle {
+        size: 25.0,
         align: UILabelAlignment::Center,
         color: [1.0, 1.0, 1.0, 1.0],
         shadow_color: [0.0, 0.0, 0.0, 1.0],
+        opacity: 1.0
     };
 
     let mut text_style = UITextAreaStyle {
@@ -114,6 +123,16 @@ fn main() {
         },
     ));
 
+    macro_rules! create_title_label {
+        ($text:expr) => {
+            manager.create(UILabel::new(
+                label_context.clone(),
+                $text,
+                titile_label_style,
+            ))
+        };
+    };
+
     macro_rules! create_label {
         ($text:expr) => {
             manager.create(UILabel::new(label_context.clone(), $text, label_style))
@@ -143,6 +162,8 @@ fn main() {
     };
 
     // Create UI elements
+    let outline_label = create_title_label!("Outline");
+
     let red_label = create_label!("red", 0.988, 0.576, 0.576);
     let red_slider = create_slider!(text_style.text_color.r);
 
@@ -160,6 +181,8 @@ fn main() {
 
     let sharpness_label = create_label!("sharpness");
     let sharpness_slider = create_slider!(text_style.sharpness);
+
+    let shadow_label = create_title_label!("Shadow");
 
     // Create screen layout
     let main_layout = manager.create(UIMainLayout {
@@ -183,7 +206,8 @@ fn main() {
     let vbox_layout = manager.create(UIVBoxLayout {
         min_height: 30.0,
         max_height: 50.0,
-        padding: 20.0,
+        hpadding: 20.0,
+        vpadding: 8.0,
     });
 
     let slider_layout = UISliderLayout { label_offset: 20.0 };
@@ -201,12 +225,16 @@ fn main() {
     manager.add_child(main_layout, text_area);
 
     manager.add_child(drawer_layout, vbox_layout);
+
+    manager.add_child(vbox_layout, outline_label);
     manager.add_child(vbox_layout, red_layout);
     manager.add_child(vbox_layout, green_layout);
     manager.add_child(vbox_layout, blue_layout);
     manager.add_child(vbox_layout, inner_dist_layout);
     manager.add_child(vbox_layout, outer_dist_layout);
     manager.add_child(vbox_layout, sharpness_layout);
+
+    manager.add_child(vbox_layout, shadow_label);
 
     manager.add_child(red_layout, red_slider);
     manager.add_child(red_layout, red_label);

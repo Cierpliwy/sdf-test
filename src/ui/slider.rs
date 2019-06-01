@@ -29,11 +29,15 @@ pub struct UISlider {
     block: UIBlock,
     dot: UIBlock,
     label: UILabel,
-    hover: bool,
     pressed: bool,
+    hover: bool,
     hover_from: f32,
     hover_to: f32,
     hover_time: Instant,
+    slider_hover: bool,
+    slider_hover_from: f32,
+    slider_hover_to: f32,
+    slider_hover_time: Instant,
     min_value: f32,
     max_value: f32,
     step_value: f32,
@@ -87,6 +91,7 @@ impl UISlider {
                 align: UILabelAlignment::Center,
                 color: [0.7, 0.7, 0.7, 1.0],
                 shadow_color: [0.0, 0.0, 0.0, 1.0],
+                opacity: 0.0,
             },
         );
 
@@ -94,11 +99,15 @@ impl UISlider {
             block,
             dot,
             label,
-            hover: false,
             pressed: false,
+            hover: false,
             hover_from: 0.0,
             hover_to: 0.0,
             hover_time: Instant::now(),
+            slider_hover: false,
+            slider_hover_from: 0.0,
+            slider_hover_to: 0.0,
+            slider_hover_time: Instant::now(),
             min_value,
             max_value,
             step_value,
@@ -110,6 +119,13 @@ impl UISlider {
     fn hover_value(&self) -> f32 {
         let animation = (self.hover_time.elapsed_seconds() * 8.0).min(1.0) as f32;
         let t = (self.hover_to - self.hover_from) * animation + self.hover_from;
+        1.0 - (t - 1.0).powf(2.0)
+    }
+
+    fn slider_hover_value(&self) -> f32 {
+        let animation = (self.slider_hover_time.elapsed_seconds() * 8.0).min(1.0) as f32;
+        let t =
+            (self.slider_hover_to - self.slider_hover_from) * animation + self.slider_hover_from;
         1.0 - (t - 1.0).powf(2.0)
     }
 
@@ -225,9 +241,15 @@ impl UIWidget for UISlider {
             },
         };
 
+        let label_style = UILabelStyle {
+            opacity: self.slider_hover_value(),
+            ..self.label.get_style()
+        };
+
         let mut label_layout_result = [UILayout::zero()];
         label_layout.layout(dot_layout, &mut label_layout_result);
-        self.label.render(frame, label_layout_result[0], screen);
+        self.label
+            .render_styled(frame, label_layout_result[0], label_style, screen);
     }
 
     #[allow(clippy::float_cmp)]
@@ -242,7 +264,7 @@ impl UIWidget for UISlider {
         let slider_layout = self
             .calc_slider_layout(layout)
             .extend(self.dot.get_style().radius);
-        let slider_hover = slider_layout.is_inside(frame_input.mouse_pos);
+        let slider_hover = slider_layout.is_inside(frame_input.mouse_pos) || hover;
         let pressed = frame_input.left_mouse_button_pressed;
 
         if self.hover {
@@ -257,7 +279,19 @@ impl UIWidget for UISlider {
             self.hover_time = Instant::now();
         }
 
-        if !self.pressed && pressed && (slider_hover || hover) && self.drag_value.is_none() {
+        if self.slider_hover {
+            if !slider_hover {
+                self.slider_hover_from = self.slider_hover_value();
+                self.slider_hover_to = 0.0;
+                self.slider_hover_time = Instant::now();
+            }
+        } else if slider_hover {
+            self.slider_hover_from = self.slider_hover_value();
+            self.slider_hover_to = 1.0;
+            self.slider_hover_time = Instant::now();
+        }
+
+        if !self.pressed && pressed && slider_hover && self.drag_value.is_none() {
             self.drag_value = Some(self.value);
         }
 
@@ -279,5 +313,6 @@ impl UIWidget for UISlider {
 
         self.pressed = pressed;
         self.hover = hover;
+        self.slider_hover = slider_hover;
     }
 }

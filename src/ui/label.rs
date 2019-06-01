@@ -56,6 +56,7 @@ impl UILabelContext {
             uniform float uSharpness;
             uniform vec4 uColor;
             uniform vec4 uShadowColor;
+            uniform float uOpacity;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -66,7 +67,7 @@ impl UILabelContext {
                 float d = median(t.r, t.g, t.b);
                 float alpha = smoothstep(0.6, 0.3, d);
                 color = mix(uColor, uShadowColor, alpha);
-                color.a = color.a * smoothstep(0.45 - uSharpness, 0.45 + uSharpness, d);
+                color.a = color.a * smoothstep(0.45 - uSharpness, 0.45 + uSharpness, d) * uOpacity;
             }
         "#,
         })
@@ -162,6 +163,7 @@ pub struct UILabelStyle {
     pub size: f32,
     pub color: [f32; 4],
     pub shadow_color: [f32; 4],
+    pub opacity: f32,
 }
 
 pub struct UILabel {
@@ -333,6 +335,7 @@ impl UILabel {
                             uPosition: pos,
                             uScreen: screen,
                             uColor: style.color,
+                            uOpacity: style.opacity,
                             uShadowColor: style.shadow_color
                         },
                         &DrawParameters {
