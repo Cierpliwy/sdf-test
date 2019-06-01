@@ -56,6 +56,7 @@ pub struct UITextAreaStyle {
     pub text_size: f32,
     pub inner_dist: f32,
     pub outer_dist: f32,
+    pub sharpness: f32,
     pub shadow_dist: f32,
     pub text_color: Color,
     pub shadow_color: Color,
@@ -67,6 +68,7 @@ impl Default for UITextAreaStyle {
             text_size: 32.0,
             inner_dist: 0.0,
             outer_dist: 0.5,
+            sharpness: 0.4,
             shadow_dist: 0.5,
             text_color: Color::black(),
             shadow_color: Color::black(),
@@ -113,6 +115,8 @@ impl UITextAreaContext {
 
             uniform sampler2D uTexture;
             uniform float uSharpness;
+            uniform float uInnerDist;
+            uniform float uOuterDist;
             uniform vec4 uColor;
             uniform vec4 uShadowColor;
 
@@ -123,9 +127,10 @@ impl UITextAreaContext {
             void main() {
                 vec4 t = texture(uTexture, vCoord);
                 float d = median(t.r, t.g, t.b);
-                float alpha = smoothstep(0.6, 0.3, d);
-                color = mix(uColor, uShadowColor, alpha);
-                color.a = color.a * smoothstep(0.45 - uSharpness, 0.45 + uSharpness, d);
+                color = uColor;
+                float outer_alpha = smoothstep(uOuterDist - uSharpness, uOuterDist + uSharpness, d);
+                float inner_alpha = smoothstep(uInnerDist + uSharpness, uInnerDist - uSharpness, d);
+                color.a = inner_alpha * outer_alpha;
             }
         "#,
         })
@@ -456,8 +461,7 @@ impl UITextArea {
         let context = self.context.borrow_mut();
         let shadow_size = context.font.get_shadow_size();
         let font_size = context.font.get_font_size();
-        let font_sharpness = 0.4;
-        let sharpness = font_sharpness
+        let sharpness = self.style.sharpness
             / f32::from(shadow_size)
             / (style.text_size * self.zoom / f32::from(font_size));
 
@@ -470,6 +474,8 @@ impl UITextArea {
                         &context.program,
                         &uniform! {
                             uTexture: texture,
+                            uInnerDist: 1.0 - style.inner_dist,
+                            uOuterDist: 1.0 - style.outer_dist,
                             uSharpness: sharpness,
                             uFontSize: style.text_size * self.zoom,
                             uPosition: pos,

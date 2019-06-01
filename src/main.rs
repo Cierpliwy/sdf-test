@@ -3,9 +3,7 @@ pub mod text;
 pub mod ui;
 pub mod utils;
 
-use crate::renderer_thread::{
-    renderer_entry_point, RendererCommand, RendererContext, RendererResult,
-};
+use crate::renderer_thread::*;
 use crate::ui::block::*;
 use crate::ui::button::*;
 use crate::ui::label::*;
@@ -29,7 +27,7 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
-        .with_title("Multi-channel signed distance font demo - by Cierpliwy");
+        .with_title("Multi-channel Signed Distance Field Font Demo");
     let context = glutin::ContextBuilder::new().with_vsync(false);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
@@ -39,8 +37,7 @@ fn main() {
         height: screen_dim[1],
     });
 
-    // Create UI contexts
-    let block_context = Rc::new(UIBlockContext::new(&display));
+    // Create fonts
     let font = Font::new(
         1024,
         1024,
@@ -49,6 +46,17 @@ fn main() {
         (&include_bytes!("../assets/monserat.ttf")[..]).into(),
     )
     .expect("Cannot load UI font");
+    let text_area_font = Font::new(
+        1024,
+        1024,
+        64,
+        16,
+        (&include_bytes!("../assets/monserat.ttf")[..]).into(),
+    )
+    .expect("Cannot load TextArea font");
+
+    // Create UI contexts
+    let block_context = Rc::new(UIBlockContext::new(&display));
     let label_context = Rc::new(RefCell::new(UILabelContext::new(&display, font)));
     let button_context = Rc::new(UIButtonContext::new(
         block_context.clone(),
@@ -58,39 +66,39 @@ fn main() {
         block_context.clone(),
         label_context.clone(),
     ));
-    let font2 = Font::new(
-        1024,
-        1024,
-        64,
-        16,
-        (&include_bytes!("../assets/monserat.ttf")[..]).into(),
-    )
-    .expect("Cannot load TextArea font");
-    let text_area_context = Rc::new(RefCell::new(UITextAreaContext::new(&display, font2)));
+    let text_area_context = Rc::new(RefCell::new(UITextAreaContext::new(
+        &display,
+        text_area_font,
+    )));
 
-    // Create UI elements
+    // Prepare UI elements styles and common functions.
+    let label_style = UILabelStyle {
+        size: 16.0,
+        align: UILabelAlignment::Center,
+        color: [1.0, 1.0, 1.0, 1.0],
+        shadow_color: [0.0, 0.0, 0.0, 1.0],
+    };
 
     let mut text_style = UITextAreaStyle {
         text_size: 40.0,
         inner_dist: 0.0,
-        outer_dist: 1.0,
+        outer_dist: 0.55,
         shadow_dist: 1.1,
-        text_color: Color::new(1.0, 0.3, 0.4),
+        sharpness: 0.4,
+        text_color: Color::new(0.75, 0.82, 1.0),
         shadow_color: Color::new(0.8, 0.4, 0.8),
     };
 
     let text_area = manager.create(UITextArea::new(
         text_area_context.clone(),
-        "Welcome to the SDF font demo!\n\nYou can use left menu to adjust font and texture settings. Move text and zoom it with touchpad and type anything which you want :)\n\nPrzemysław Lenart",
-       text_style
+        r#"Welcome to the MCSDF font demo!
+        
+        • Use the left panel to adjust font rendering settings.
+        • Use the right panel to regenerate MCSDF texture.
+        • Type anything you want."#,
+        text_style,
     ));
 
-    let label_style = UILabelStyle {
-        size: 20.0,
-        align: UILabelAlignment::Center,
-        color: [1.0, 1.0, 1.0, 1.0],
-        shadow_color: [0.0, 0.0, 0.0, 1.0],
-    };
     let drawer_block = manager.create(UIBlock::new(
         block_context.clone(),
         UIBlockStyle {
@@ -106,65 +114,52 @@ fn main() {
         },
     ));
 
-    let red_label = manager.create(UILabel::new(
-        label_context.clone(),
-        "red",
-        UILabelStyle {
-            color: [0.988, 0.576, 0.576, 1.0],
-            ..label_style
-        },
-    ));
-    let red_slider = manager.create(UISlider::new(
-        &slider_context,
-        0.0,
-        1.0,
-        1.0 / 256.0,
-        text_style.text_color.r,
-    ));
+    macro_rules! create_label {
+        ($text:expr) => {
+            manager.create(UILabel::new(label_context.clone(), $text, label_style))
+        };
+        ($text:expr, $r:expr, $g:expr, $b:expr) => {
+            manager.create(UILabel::new(
+                label_context.clone(),
+                $text,
+                UILabelStyle {
+                    color: [$r, $g, $b, 1.0],
+                    ..label_style
+                },
+            ))
+        };
+    };
 
-    let green_label = manager.create(UILabel::new(
-        label_context.clone(),
-        "green",
-        UILabelStyle {
-            color: [0.735, 0.941, 0.724, 1.0],
-            ..label_style
-        },
-    ));
-    let green_slider = manager.create(UISlider::new(
-        &slider_context,
-        0.0,
-        1.0,
-        1.0 / 256.0,
-        text_style.text_color.g,
-    ));
+    macro_rules! create_slider {
+        ($default:expr) => {
+            manager.create(UISlider::new(
+                &slider_context,
+                1.0 / 256.0,
+                1.0,
+                1.0 / 256.0,
+                $default,
+            ))
+        };
+    };
 
-    let blue_label = manager.create(UILabel::new(
-        label_context.clone(),
-        "blue",
-        UILabelStyle {
-            color: [0.716, 0.708, 0.933, 1.0],
-            ..label_style
-        },
-    ));
+    // Create UI elements
+    let red_label = create_label!("red", 0.988, 0.576, 0.576);
+    let red_slider = create_slider!(text_style.text_color.r);
 
-    let blue_slider = manager.create(UISlider::new(
-        &slider_context,
-        0.0,
-        1.0,
-        1.0 / 256.0,
-        text_style.text_color.b,
-    ));
+    let green_label = create_label!("green", 0.735, 0.941, 0.724);
+    let green_slider = create_slider!(text_style.text_color.g);
 
-    let inner_label = manager.create(UILabel::new(
-        label_context.clone(),
-        "inner distance",
-        label_style,
-    ));
-    let outer_label = manager.create(UILabel::new(
-        label_context.clone(),
-        "outer distance",
-        label_style,
-    ));
+    let blue_label = create_label!("blue", 0.716, 0.708, 0.933);
+    let blue_slider = create_slider!(text_style.text_color.b);
+
+    let inner_dist_label = create_label!("inner distance");
+    let inner_dist_slider = create_slider!(text_style.inner_dist);
+
+    let outer_dist_label = create_label!("outer distance");
+    let outer_dist_slider = create_slider!(text_style.outer_dist);
+
+    let sharpness_label = create_label!("sharpness");
+    let sharpness_slider = create_slider!(text_style.sharpness);
 
     // Create screen layout
     let main_layout = manager.create(UIMainLayout {
@@ -195,6 +190,9 @@ fn main() {
     let red_layout = manager.create(slider_layout);
     let green_layout = manager.create(slider_layout);
     let blue_layout = manager.create(slider_layout);
+    let inner_dist_layout = manager.create(slider_layout);
+    let outer_dist_layout = manager.create(slider_layout);
+    let sharpness_layout = manager.create(slider_layout);
 
     // Organize views
     manager.root(main_layout);
@@ -206,6 +204,9 @@ fn main() {
     manager.add_child(vbox_layout, red_layout);
     manager.add_child(vbox_layout, green_layout);
     manager.add_child(vbox_layout, blue_layout);
+    manager.add_child(vbox_layout, inner_dist_layout);
+    manager.add_child(vbox_layout, outer_dist_layout);
+    manager.add_child(vbox_layout, sharpness_layout);
 
     manager.add_child(red_layout, red_slider);
     manager.add_child(red_layout, red_label);
@@ -213,7 +214,12 @@ fn main() {
     manager.add_child(green_layout, green_label);
     manager.add_child(blue_layout, blue_slider);
     manager.add_child(blue_layout, blue_label);
-
+    manager.add_child(inner_dist_layout, inner_dist_slider);
+    manager.add_child(inner_dist_layout, inner_dist_label);
+    manager.add_child(outer_dist_layout, outer_dist_slider);
+    manager.add_child(outer_dist_layout, outer_dist_label);
+    manager.add_child(sharpness_layout, sharpness_slider);
+    manager.add_child(sharpness_layout, sharpness_label);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -229,24 +235,8 @@ fn main() {
 
     let mut exit = false;
     let mut scale = false;
-    let mut fps_array = [0.0; 64];
-    let mut fps_index = 0;
-    let mut start_frame_time: Option<Instant> = None;
 
     while !exit {
-        // FPS counting
-        let avg_fps: f64 = fps_array.iter().sum::<f64>() / fps_array.len() as f64;
-        // manager.update(label, |l| {
-        //     l.set_text(&format!("FPS: {:.2}", avg_fps));
-        // });
-
-        if let Some(time) = start_frame_time {
-            let fps = 1.0 / time.elapsed_seconds();
-            fps_array[fps_index] = fps;
-            fps_index = (fps_index + 1) % fps_array.len();
-        }
-        start_frame_time = Some(Instant::now());
-
         // Update widgets
         manager.update(text_area, |t| {
             t.set_style(text_style);
@@ -360,47 +350,40 @@ fn main() {
             _ => (),
         });
 
-        // Handle user events
-        manager.poll_events(red_slider, |e| {
-            let value = match e {
-                UISliderEvent::ValueChanged(v) => v,
-                UISliderEvent::ValueFinished(v) => v,
+        // Handle font style
+        macro_rules! handle_font_style_slider {
+            ($slider:expr, $name:ident, $map:expr) => {
+                manager.poll_events($slider, |e| {
+                    let value = match e {
+                        UISliderEvent::ValueChanged(v) => v,
+                        UISliderEvent::ValueFinished(v) => v,
+                    };
+                    text_style = UITextAreaStyle {
+                        $name: $map(*value),
+                        ..text_style
+                    };
+                });
             };
-            text_style = UITextAreaStyle {
-                text_color: Color::new(*value, text_style.text_color.g, text_style.text_color.b),
-                ..text_style
-            };
-        });
+        }
 
-        manager.poll_events(green_slider, |e| {
-            let value = match e {
-                UISliderEvent::ValueChanged(v) => v,
-                UISliderEvent::ValueFinished(v) => v,
-            };
-            text_style = UITextAreaStyle {
-                text_color: Color::new(text_style.text_color.r, *value, text_style.text_color.b),
-                ..text_style
-            };
-        });
-
-        manager.poll_events(blue_slider, |e| {
-            let value = match e {
-                UISliderEvent::ValueChanged(v) => v,
-                UISliderEvent::ValueFinished(v) => v,
-            };
-            text_style = UITextAreaStyle {
-                text_color: Color::new(text_style.text_color.r, text_style.text_color.g, *value),
-                ..text_style
-            };
-        });
-
-        // manager.poll_events(button, |e| match e {
-        //     UIButtonEvent::Toggled(toggled) => println!("Button toggled: {}", toggled),
-        // });
-        // manager.poll_events(slider, |e| match e {
-        //     UISliderEvent::ValueChanged(v) => println!("Value changed: {}", v),
-        //     UISliderEvent::ValueFinished(v) => println!("Value finished: {}", v),
-        // });
+        handle_font_style_slider!(red_slider, text_color, |v: f32| Color::new(
+            v,
+            text_style.text_color.g,
+            text_style.text_color.b
+        ));
+        handle_font_style_slider!(green_slider, text_color, |v: f32| Color::new(
+            text_style.text_color.r,
+            v,
+            text_style.text_color.b
+        ));
+        handle_font_style_slider!(blue_slider, text_color, |v: f32| Color::new(
+            text_style.text_color.r,
+            text_style.text_color.g,
+            v
+        ));
+        handle_font_style_slider!(inner_dist_slider, inner_dist, |v: f32| v);
+        handle_font_style_slider!(outer_dist_slider, outer_dist, |v: f32| v);
+        handle_font_style_slider!(sharpness_slider, sharpness, |v: f32| v);
     }
 
     renderer_command_sender
