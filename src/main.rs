@@ -11,7 +11,6 @@ use crate::ui::layout::*;
 use crate::ui::slider::*;
 use crate::ui::text_area::*;
 use crate::ui::widget::*;
-use crate::utils::*;
 
 use glium::{glutin, Surface};
 use sdf::font::Font;
@@ -23,7 +22,7 @@ use std::time::Instant;
 
 fn main() {
     // Create GL objects
-    let screen_dim = [640.0, 480.0];
+    let screen_dim = [1400.0, 900.0];
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
@@ -77,7 +76,7 @@ fn main() {
         align: UILabelAlignment::Left,
         color: [1.0, 1.0, 1.0, 1.0],
         shadow_color: [0.0, 0.0, 0.0, 1.0],
-        opacity: 1.0
+        opacity: 1.0,
     };
 
     let titile_label_style = UILabelStyle {
@@ -85,7 +84,7 @@ fn main() {
         align: UILabelAlignment::Center,
         color: [1.0, 1.0, 1.0, 1.0],
         shadow_color: [0.0, 0.0, 0.0, 1.0],
-        opacity: 1.0
+        opacity: 1.0,
     };
 
     let mut text_style = UITextAreaStyle {
@@ -94,8 +93,12 @@ fn main() {
         outer_dist: 0.55,
         shadow_dist: 1.1,
         sharpness: 0.4,
-        text_color: Color::new(0.75, 0.82, 1.0),
-        shadow_color: Color::new(0.8, 0.4, 0.8),
+        text_color: Color::new(1.0, 1.0, 1.0),
+        shadow_color: Color::new(0.19, 0.36, 1.0),
+        shadow_pos: 0.24,
+        shadow_size: 0.21,
+        shadow_alpha: 0.08,
+        texture_visibility: 0.0,
     };
 
     let text_area = manager.create(UITextArea::new(
@@ -108,20 +111,22 @@ fn main() {
         text_style,
     ));
 
-    let drawer_block = manager.create(UIBlock::new(
-        block_context.clone(),
-        UIBlockStyle {
-            alpha: 0.99,
-            radius: 15.0,
-            sharpness: 1.0,
-            left_offset: 0.0,
-            left_color: [0.015, 0.015, 0.015],
-            right_offset: 0.0,
-            right_color: [0.015, 0.015, 0.015],
-            inner_shadow: 30.0,
-            shade_color: [0.005, 0.005, 0.005],
-        },
-    ));
+    let drawer_block_style = UIBlockStyle {
+        alpha: 0.99,
+        radius: 15.0,
+        sharpness: 1.0,
+        left_offset: 0.0,
+        left_color: [0.015, 0.015, 0.015],
+        right_offset: 0.0,
+        right_color: [0.015, 0.015, 0.015],
+        inner_shadow: 30.0,
+        shade_color: [0.005, 0.005, 0.005],
+    };
+
+    let left_drawer_block = manager.create(UIBlock::new(block_context.clone(), drawer_block_style));
+
+    let right_drawer_block =
+        manager.create(UIBlock::new(block_context.clone(), drawer_block_style));
 
     macro_rules! create_title_label {
         ($text:expr) => {
@@ -184,6 +189,31 @@ fn main() {
 
     let shadow_label = create_title_label!("Shadow");
 
+    let shadow_red_label = create_label!("red", 0.988, 0.576, 0.576);
+    let shadow_red_slider = create_slider!(text_style.shadow_color.r);
+
+    let shadow_green_label = create_label!("green", 0.735, 0.941, 0.724);
+    let shadow_green_slider = create_slider!(text_style.shadow_color.g);
+
+    let shadow_blue_label = create_label!("blue", 0.716, 0.708, 0.933);
+    let shadow_blue_slider = create_slider!(text_style.shadow_color.g);
+
+    let shadow_alpha_label = create_label!("alpha");
+    let shadow_alpha_slider = create_slider!(text_style.shadow_alpha);
+
+    let shadow_pos_label = create_label!("position");
+    let shadow_pos_slider = create_slider!(text_style.shadow_pos);
+
+    let shadow_size_label = create_label!("size");
+    let shadow_size_slider = create_slider!(text_style.shadow_size);
+
+    let other_label = create_title_label!("Other");
+
+    let texture_visibility_label = create_label!("texture visibility");
+    let texture_visibility_slider = create_slider!(text_style.texture_visibility);
+
+    let animation_button = manager.create(UIButton::new(&button_context, "Show animation"));
+
     // Create screen layout
     let main_layout = manager.create(UIMainLayout {
         padding: 20.0,
@@ -192,7 +222,7 @@ fn main() {
         ratio: 0.3,
     });
 
-    let drawer_layout = manager.create(UIRelativeLayout {
+    let left_drawer_layout = manager.create(UIRelativeLayout {
         size: UISize {
             width: 1.0,
             height: 1.0,
@@ -203,7 +233,25 @@ fn main() {
         },
     });
 
-    let vbox_layout = manager.create(UIVBoxLayout {
+    let right_drawer_layout = manager.create(UIRelativeLayout {
+        size: UISize {
+            width: 1.0,
+            height: 1.0,
+        },
+        pos: UIPoint {
+            left: 0.00,
+            top: 0.00,
+        },
+    });
+
+    let left_vbox_layout = manager.create(UIVBoxLayout {
+        min_height: 30.0,
+        max_height: 50.0,
+        hpadding: 20.0,
+        vpadding: 8.0,
+    });
+
+    let right_vbox_layout = manager.create(UIVBoxLayout {
         min_height: 30.0,
         max_height: 50.0,
         hpadding: 20.0,
@@ -218,23 +266,45 @@ fn main() {
     let outer_dist_layout = manager.create(slider_layout);
     let sharpness_layout = manager.create(slider_layout);
 
+    let shadow_red_layout = manager.create(slider_layout);
+    let shadow_green_layout = manager.create(slider_layout);
+    let shadow_blue_layout = manager.create(slider_layout);
+    let shadow_alpha_layout = manager.create(slider_layout);
+    let shadow_pos_layout = manager.create(slider_layout);
+    let shadow_size_layout = manager.create(slider_layout);
+
+    let texture_visibility_layout = manager.create(slider_layout);
+
     // Organize views
     manager.root(main_layout);
-    manager.add_child(main_layout, drawer_layout);
-    manager.add_child(drawer_layout, drawer_block);
+    manager.add_child(main_layout, left_drawer_layout);
+    manager.add_child(left_drawer_layout, left_drawer_block);
+
     manager.add_child(main_layout, text_area);
 
-    manager.add_child(drawer_layout, vbox_layout);
+    manager.add_child(main_layout, right_drawer_layout);
+    manager.add_child(right_drawer_layout, right_drawer_block);
 
-    manager.add_child(vbox_layout, outline_label);
-    manager.add_child(vbox_layout, red_layout);
-    manager.add_child(vbox_layout, green_layout);
-    manager.add_child(vbox_layout, blue_layout);
-    manager.add_child(vbox_layout, inner_dist_layout);
-    manager.add_child(vbox_layout, outer_dist_layout);
-    manager.add_child(vbox_layout, sharpness_layout);
+    manager.add_child(left_drawer_layout, left_vbox_layout);
+    manager.add_child(right_drawer_layout, right_vbox_layout);
 
-    manager.add_child(vbox_layout, shadow_label);
+    // Left drawer
+
+    manager.add_child(left_vbox_layout, outline_label);
+    manager.add_child(left_vbox_layout, red_layout);
+    manager.add_child(left_vbox_layout, green_layout);
+    manager.add_child(left_vbox_layout, blue_layout);
+    manager.add_child(left_vbox_layout, inner_dist_layout);
+    manager.add_child(left_vbox_layout, outer_dist_layout);
+    manager.add_child(left_vbox_layout, sharpness_layout);
+
+    manager.add_child(left_vbox_layout, shadow_label);
+    manager.add_child(left_vbox_layout, shadow_red_layout);
+    manager.add_child(left_vbox_layout, shadow_green_layout);
+    manager.add_child(left_vbox_layout, shadow_blue_layout);
+    manager.add_child(left_vbox_layout, shadow_alpha_layout);
+    manager.add_child(left_vbox_layout, shadow_pos_layout);
+    manager.add_child(left_vbox_layout, shadow_size_layout);
 
     manager.add_child(red_layout, red_slider);
     manager.add_child(red_layout, red_label);
@@ -248,6 +318,28 @@ fn main() {
     manager.add_child(outer_dist_layout, outer_dist_label);
     manager.add_child(sharpness_layout, sharpness_slider);
     manager.add_child(sharpness_layout, sharpness_label);
+
+    manager.add_child(shadow_red_layout, shadow_red_slider);
+    manager.add_child(shadow_red_layout, shadow_red_label);
+    manager.add_child(shadow_green_layout, shadow_green_slider);
+    manager.add_child(shadow_green_layout, shadow_green_label);
+    manager.add_child(shadow_blue_layout, shadow_blue_slider);
+    manager.add_child(shadow_blue_layout, shadow_blue_label);
+    manager.add_child(shadow_alpha_layout, shadow_alpha_slider);
+    manager.add_child(shadow_alpha_layout, shadow_alpha_label);
+    manager.add_child(shadow_pos_layout, shadow_pos_slider);
+    manager.add_child(shadow_pos_layout, shadow_pos_label);
+    manager.add_child(shadow_size_layout, shadow_size_slider);
+    manager.add_child(shadow_size_layout, shadow_size_label);
+
+    // Right drawer
+
+    manager.add_child(right_vbox_layout, other_label);
+    manager.add_child(right_vbox_layout, animation_button);
+    manager.add_child(right_vbox_layout, texture_visibility_layout);
+
+    manager.add_child(texture_visibility_layout, texture_visibility_slider);
+    manager.add_child(texture_visibility_layout, texture_visibility_label);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -394,6 +486,8 @@ fn main() {
             };
         }
 
+        // Handle left panel actions.
+
         handle_font_style_slider!(red_slider, text_color, |v: f32| Color::new(
             v,
             text_style.text_color.g,
@@ -412,6 +506,29 @@ fn main() {
         handle_font_style_slider!(inner_dist_slider, inner_dist, |v: f32| v);
         handle_font_style_slider!(outer_dist_slider, outer_dist, |v: f32| v);
         handle_font_style_slider!(sharpness_slider, sharpness, |v: f32| v);
+
+        handle_font_style_slider!(shadow_red_slider, shadow_color, |v: f32| Color::new(
+            v,
+            text_style.shadow_color.g,
+            text_style.shadow_color.b
+        ));
+        handle_font_style_slider!(shadow_green_slider, shadow_color, |v: f32| Color::new(
+            text_style.shadow_color.r,
+            v,
+            text_style.shadow_color.b
+        ));
+        handle_font_style_slider!(shadow_blue_slider, shadow_color, |v: f32| Color::new(
+            text_style.shadow_color.r,
+            text_style.shadow_color.g,
+            v
+        ));
+        handle_font_style_slider!(shadow_pos_slider, shadow_pos, |v: f32| v);
+        handle_font_style_slider!(shadow_size_slider, shadow_size, |v: f32| v);
+        handle_font_style_slider!(shadow_alpha_slider, shadow_alpha, |v: f32| v);
+
+        // Handle right panel actions.
+
+        handle_font_style_slider!(texture_visibility_slider, texture_visibility, |v: f32| v);
     }
 
     renderer_command_sender

@@ -60,6 +60,10 @@ pub struct UITextAreaStyle {
     pub shadow_dist: f32,
     pub text_color: Color,
     pub shadow_color: Color,
+    pub shadow_pos: f32,
+    pub shadow_size: f32,
+    pub shadow_alpha: f32,
+    pub texture_visibility: f32,
 }
 
 impl Default for UITextAreaStyle {
@@ -72,6 +76,10 @@ impl Default for UITextAreaStyle {
             shadow_dist: 0.5,
             text_color: Color::black(),
             shadow_color: Color::black(),
+            shadow_pos: 0.0,
+            shadow_size: 0.0,
+            shadow_alpha: 0.0,
+            texture_visibility: 0.0,
         }
     }
 }
@@ -119,6 +127,10 @@ impl UITextAreaContext {
             uniform float uOuterDist;
             uniform vec4 uColor;
             uniform vec4 uShadowColor;
+            uniform float uShadowPos;
+            uniform float uShadowSize;
+            uniform float uShadowAlpha;
+            uniform float uTextureVisibility;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -127,10 +139,17 @@ impl UITextAreaContext {
             void main() {
                 vec4 t = texture(uTexture, vCoord);
                 float d = median(t.r, t.g, t.b);
-                color = uColor;
+
+                vec4 outline_color = uColor;
                 float outer_alpha = smoothstep(uOuterDist - uSharpness, uOuterDist + uSharpness, d);
                 float inner_alpha = smoothstep(uInnerDist + uSharpness, uInnerDist - uSharpness, d);
-                color.a = inner_alpha * outer_alpha;
+                outline_color.a = inner_alpha * outer_alpha;
+
+                vec4 shadow_color = uShadowColor;
+                shadow_color.a = (1.0 - clamp(abs(d - uShadowPos) / uShadowSize, 0.0, 1.0)) * uShadowAlpha;
+
+                vec4 font_color = mix(outline_color, shadow_color, 1.0 - outline_color.a);
+                color = mix(font_color, t, uTextureVisibility);
             }
         "#,
         })
@@ -481,7 +500,11 @@ impl UITextArea {
                             uPosition: pos,
                             uScreen: screen,
                             uColor: style.text_color,
-                            uShadowColor: style.shadow_color
+                            uShadowColor: style.shadow_color,
+                            uShadowPos: style.shadow_pos,
+                            uShadowSize: style.shadow_size,
+                            uShadowAlpha: style.shadow_alpha,
+                            uTextureVisibility: style.texture_visibility
                         },
                         &DrawParameters {
                             blend: Blend::alpha_blending(),

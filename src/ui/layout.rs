@@ -76,8 +76,8 @@ pub struct UIMainLayout {
 impl UIWidget for UIMainLayout {
     type Event = ();
     fn layout(&self, layout: UILayout, children: &mut [UILayout]) {
-        if children.len() != 2 {
-            panic!("Expected 2 children in main layout!");
+        if children.len() != 3 {
+            panic!("Expected 3 children in main layout!");
         }
 
         let drawer_width = (layout.width * self.ratio)
@@ -95,7 +95,14 @@ impl UIWidget for UIMainLayout {
             left: drawer_width,
             top: self.padding,
             height: layout.height - 2.0 * self.padding,
-            width: layout.width - drawer_width - self.padding,
+            width: layout.width - 2.0 * drawer_width,
+        };
+
+        children[2] = UILayout {
+            left: layout.width - drawer_width + self.padding,
+            top: self.padding,
+            height: layout.height - 2.0 * self.padding,
+            width: drawer_width - 2.0 * self.padding,
         };
     }
 }
@@ -122,7 +129,8 @@ impl UIWidget for UIVBoxLayout {
             child.left = layout.left + self.hpadding;
             child.width = layout.width - self.hpadding * 2.0;
             child.height = height;
-            child.top = layout.top + layout.height - (index as f32 + 1.0) * (self.vpadding + height);
+            child.top =
+                layout.top + layout.height - (index as f32 + 1.0) * (self.vpadding + height);
         }
     }
 }
