@@ -73,6 +73,15 @@ impl UILayout {
             && point.top >= self.top
             && point.top <= self.top + self.height
     }
+
+    pub fn extend(&self, padding: f32) -> UILayout {
+        UILayout {
+            left: self.left - padding,
+            top: self.top - padding,
+            width: self.width + padding * 2.0,
+            height: self.height + padding * 2.0,
+        }
+    }
 }
 
 impl UIFrameInput {

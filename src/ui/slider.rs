@@ -125,6 +125,23 @@ impl UISlider {
         (value - self.min_value) / (self.max_value - self.min_value) * layout.width
     }
 
+    fn calc_slider_layout(&self, layout: UILayout) -> UILayout {
+        let background_height = self.block.get_style().radius * 2.0;
+        let background_layout = UIAbsoluteLayout {
+            size: UISize {
+                width: layout.width,
+                height: background_height,
+            },
+            pos: UIPoint {
+                left: 0.0,
+                top: (layout.height - background_height) / 2.0,
+            },
+        };
+        let mut background_layout_result = [UILayout::zero()];
+        background_layout.layout(layout, &mut background_layout_result);
+        background_layout_result[0]
+    }
+
     fn calc_dot_layout(&self, layout: UILayout) -> UILayout {
         let dot_size = self.dot.get_style().radius * 2.0;
         let mut value = if let Some(drag_value) = self.drag_value {
@@ -183,21 +200,9 @@ impl UIWidget for UISlider {
             right_offset: center + 2.0,
             ..self.block.get_style()
         };
-        let background_height = background_style.radius * 2.0;
-        let background_layout = UIAbsoluteLayout {
-            size: UISize {
-                width: layout.width,
-                height: background_height,
-            },
-            pos: UIPoint {
-                left: 0.0,
-                top: (layout.height - background_height) / 2.0,
-            },
-        };
-        let mut background_layout_result = [UILayout::zero()];
-        background_layout.layout(layout, &mut background_layout_result);
+        let background_layout = self.calc_slider_layout(layout);
         self.block
-            .render_styled(frame, background_layout_result[0], background_style, screen);
+            .render_styled(frame, background_layout, background_style, screen);
 
         // Dot
         let pressed_value = if self.drag_value.is_some() { 1.0 } else { 0.0 };
@@ -234,6 +239,10 @@ impl UIWidget for UISlider {
     ) {
         let dot_layout = self.calc_dot_layout(layout);
         let hover = dot_layout.is_inside(frame_input.mouse_pos);
+        let slider_layout = self
+            .calc_slider_layout(layout)
+            .extend(self.dot.get_style().radius);
+        let slider_hover = slider_layout.is_inside(frame_input.mouse_pos);
         let pressed = frame_input.left_mouse_button_pressed;
 
         if self.hover {
@@ -248,7 +257,7 @@ impl UIWidget for UISlider {
             self.hover_time = Instant::now();
         }
 
-        if !self.pressed && pressed && hover && self.drag_value.is_none() {
+        if !self.pressed && pressed && (slider_hover || hover) && self.drag_value.is_none() {
             self.drag_value = Some(self.value);
         }
 
