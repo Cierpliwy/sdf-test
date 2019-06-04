@@ -46,10 +46,9 @@ fn main() {
     )
     .expect("Cannot load UI font");
 
-    let mut text_area_texture_size = 1024;
-    let mut text_area_font_size = 64;
-    let mut text_area_shadow_size = 16;
-    let font_data: Vec<u8> = (&include_bytes!("../assets/monserat.ttf")[..]).into();
+    let text_area_texture_size = 1024;
+    let text_area_font_size = 64;
+    let text_area_shadow_size = 16;
 
     let text_area_font = Font::new(
         text_area_texture_size,
@@ -180,13 +179,7 @@ fn main() {
             ))
         };
         ($default:expr, $min:expr, $max:expr, $step:expr) => {
-            manager.create(UISlider::new(
-                &slider_context,
-                $min,
-                $max,
-                $step,
-                $default,
-            ))
+            manager.create(UISlider::new(&slider_context, $min, $max, $step, $default))
         };
     };
 
@@ -234,13 +227,14 @@ fn main() {
     let texture_label = create_title_label!("Texture");
 
     let texture_size_label = create_label!("size");
-    let texture_size_slider = create_slider!(1024.0, 1024.0, 1024.0 * 8.0, 512.0);
+    let texture_size_slider =
+        create_slider!(text_area_texture_size as f32, 1024.0, 1024.0 * 8.0, 512.0);
 
     let texture_font_size_label = create_label!("font size");
-    let texture_font_size_slider = create_slider!(64.0, 0.0, 255.0, 1.0);
+    let texture_font_size_slider = create_slider!(text_area_font_size as f32, 0.0, 255.0, 1.0);
 
     let texture_shadow_size_label = create_label!("shadow size");
-    let texture_shadow_size_slider = create_slider!(8.0, 0.0, 255.0, 1.0);
+    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 0.0, 255.0, 1.0);
 
     let other_label = create_title_label!("Other");
 
@@ -582,6 +576,28 @@ fn main() {
         // Handle right panel actions.
 
         handle_font_style_slider!(texture_visibility_slider, texture_visibility, |v: f32| v);
+
+        macro_rules! handle_texture_setting {
+            ($slider:expr, $func:ident) => {
+                let mut value = None;
+                manager.poll_events($slider, |e| {
+                    match e {
+                        UISliderEvent::ValueChanged(_) => {}
+                        UISliderEvent::ValueFinished(v) => value = Some(*v),
+                    };
+                });
+                if let Some(v) = value {
+                    text_area_context.borrow_mut().$func(v);
+                    manager.update(text_area, |t| {
+                        t.invalidate();
+                    });
+                }
+            };
+        };
+
+        handle_texture_setting!(texture_size_slider, set_texture_size);
+        handle_texture_setting!(texture_font_size_slider, set_font_size);
+        handle_texture_setting!(texture_shadow_size_slider, set_shadow_size);
     }
 
     renderer_command_sender

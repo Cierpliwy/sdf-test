@@ -89,6 +89,19 @@ impl Font {
         })
     }
 
+    pub fn invalidate(&mut self) {
+        let (texture, allocator) = Texture::new(self.texture_width, self.texture_height);
+        let texture_metadatas = vec![TextureMetadata {
+            texture: Arc::new(Mutex::new(texture)),
+            allocator,
+            allocated_shapes: Vec::new(),
+        }];
+
+        self.texture_metadatas = texture_metadatas;
+        self.free_texture_index = 0;
+        self.glyphs = HashMap::new();
+    }
+
     pub fn allocate_glyph(&mut self, c: char) {
         if self.glyphs.contains_key(&c) {
             return;
@@ -157,12 +170,36 @@ impl Font {
         self.texture_metadatas[texture_id as usize].texture.clone()
     }
 
+    pub fn get_texture_width(&self) -> u32 {
+        self.texture_width
+    }
+
+    pub fn get_texture_height(&self) -> u32 {
+        self.texture_height
+    }
+
+    pub fn set_texture_size(&mut self, width: u32, height: u32) {
+        self.texture_width = width;
+        self.texture_height = height;
+        self.invalidate();
+    }
+
     pub fn get_shadow_size(&self) -> u8 {
         self.shadow_size
     }
 
+    pub fn set_shadow_size(&mut self, shadow_size: u8) {
+        self.shadow_size = shadow_size;
+        self.invalidate();
+    }
+
     pub fn get_font_size(&self) -> u8 {
         self.font_size
+    }
+
+    pub fn set_font_size(&mut self, font_size: u8) {
+        self.font_size = font_size;
+        self.invalidate();
     }
 
     pub fn get_ascent(&self) -> f32 {

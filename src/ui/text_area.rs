@@ -163,6 +163,25 @@ impl UITextAreaContext {
         }
     }
 
+    pub fn invalidate(&mut self) {
+        self.texture_cache = HashMap::new();
+    }
+
+    pub fn set_texture_size(&mut self, texture_size: f32) {
+        self.font.set_texture_size(texture_size as u32, texture_size as u32);
+        self.invalidate();
+    }
+
+    pub fn set_font_size(&mut self, font_size: f32) {
+        self.font.set_font_size(font_size as u8);
+        self.invalidate();
+    }
+
+    pub fn set_shadow_size(&mut self, shadow_size: f32) {
+        self.font.set_shadow_size(shadow_size as u8);
+        self.invalidate();
+    }
+
     pub fn update_texture_cache(
         &mut self,
         id: u32,
@@ -241,7 +260,7 @@ pub struct UITextArea {
     offset: UIPoint,
     drag_offset: UIPoint,
     drag_start: Option<UIPoint>,
-    zoom: f32,
+    zoom: f32
 }
 
 impl UITextArea {
@@ -271,7 +290,7 @@ impl UITextArea {
         self.style = style;
     }
 
-    fn layout_text(&mut self) {
+    pub fn invalidate(&mut self) {
         let mut context = self.context.borrow_mut();
 
         enum FormattedText<'a> {
@@ -474,9 +493,7 @@ impl UITextArea {
             layout.left + self.offset.left + self.drag_offset.left,
             layout.top + layout.height + self.offset.top + self.drag_offset.top,
         ];
-        let size = [layout.width, layout.height];
         let screen = [screen.width, screen.height];
-
         let context = self.context.borrow_mut();
         let shadow_size = context.font.get_shadow_size();
         let font_size = context.font.get_font_size();
@@ -536,7 +553,7 @@ impl UIWidget for UITextArea {
                 width: layout.width,
                 height: layout.height,
             };
-            self.layout_text();
+            self.invalidate();
         }
 
         let left = frame_input.mouse_pos.left - layout.left;
