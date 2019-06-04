@@ -169,15 +169,6 @@ fn main() {
                 $default,
             ))
         };
-        ($default:expr, $min:expr) => {
-            manager.create(UISlider::new(
-                &slider_context,
-                $min,
-                1.0,
-                1.0 / 256.0,
-                $default,
-            ))
-        };
         ($default:expr, $min:expr, $max:expr, $step:expr) => {
             manager.create(UISlider::new(&slider_context, $min, $max, $step, $default))
         };
@@ -202,7 +193,7 @@ fn main() {
     let outer_dist_slider = create_slider!(text_style.outer_dist);
 
     let sharpness_label = create_label!("sharpness");
-    let sharpness_slider = create_slider!(text_style.sharpness, 1.0 / 256.0);
+    let sharpness_slider = create_slider!(text_style.sharpness);
 
     let shadow_label = create_title_label!("Shadow");
 
@@ -234,7 +225,7 @@ fn main() {
     let texture_font_size_slider = create_slider!(text_area_font_size as f32, 0.0, 255.0, 1.0);
 
     let texture_shadow_size_label = create_label!("shadow size");
-    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 0.0, 255.0, 1.0);
+    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 1.0, 64.0, 1.0);
 
     let other_label = create_title_label!("Other");
 

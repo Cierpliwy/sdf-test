@@ -142,7 +142,7 @@ impl UITextAreaContext {
 
                 vec4 outline_color = uColor;
                 float outer_alpha = smoothstep(uOuterDist - uSharpness, uOuterDist + uSharpness, d);
-                float inner_alpha = smoothstep(uInnerDist + uSharpness, uInnerDist - uSharpness, d);
+                float inner_alpha = uInnerDist == 1.0 ? 1.0 : smoothstep(uInnerDist + uSharpness, uInnerDist - uSharpness, d);
                 outline_color.a = inner_alpha * outer_alpha;
 
                 vec4 shadow_color = uShadowColor;
