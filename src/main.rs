@@ -27,7 +27,7 @@ fn main() {
     let window = glutin::WindowBuilder::new()
         .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
         .with_title("Multi-channel Signed Distance Field Font Demo");
-    let context = glutin::ContextBuilder::new().with_vsync(false);
+    let context = glutin::ContextBuilder::new().with_vsync(true);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
     // Create state
@@ -45,11 +45,17 @@ fn main() {
         (&include_bytes!("../assets/monserat.ttf")[..]).into(),
     )
     .expect("Cannot load UI font");
+
+    let mut text_area_texture_size = 1024;
+    let mut text_area_font_size = 64;
+    let mut text_area_shadow_size = 16;
+    let font_data: Vec<u8> = (&include_bytes!("../assets/monserat.ttf")[..]).into();
+
     let text_area_font = Font::new(
-        1024,
-        1024,
-        64,
-        16,
+        text_area_texture_size,
+        text_area_texture_size,
+        text_area_font_size,
+        text_area_shadow_size,
         (&include_bytes!("../assets/monserat.ttf")[..]).into(),
     )
     .expect("Cannot load TextArea font");
@@ -158,9 +164,27 @@ fn main() {
         ($default:expr) => {
             manager.create(UISlider::new(
                 &slider_context,
-                1.0 / 256.0,
+                0.0,
                 1.0,
                 1.0 / 256.0,
+                $default,
+            ))
+        };
+        ($default:expr, $min:expr) => {
+            manager.create(UISlider::new(
+                &slider_context,
+                $min,
+                1.0,
+                1.0 / 256.0,
+                $default,
+            ))
+        };
+        ($default:expr, $min:expr, $max:expr, $step:expr) => {
+            manager.create(UISlider::new(
+                &slider_context,
+                $min,
+                $max,
+                $step,
                 $default,
             ))
         };
@@ -185,7 +209,7 @@ fn main() {
     let outer_dist_slider = create_slider!(text_style.outer_dist);
 
     let sharpness_label = create_label!("sharpness");
-    let sharpness_slider = create_slider!(text_style.sharpness);
+    let sharpness_slider = create_slider!(text_style.sharpness, 1.0 / 256.0);
 
     let shadow_label = create_title_label!("Shadow");
 
@@ -206,6 +230,17 @@ fn main() {
 
     let shadow_size_label = create_label!("size");
     let shadow_size_slider = create_slider!(text_style.shadow_size);
+
+    let texture_label = create_title_label!("Texture");
+
+    let texture_size_label = create_label!("size");
+    let texture_size_slider = create_slider!(1024.0, 1024.0, 1024.0 * 8.0, 512.0);
+
+    let texture_font_size_label = create_label!("font size");
+    let texture_font_size_slider = create_slider!(64.0, 0.0, 255.0, 1.0);
+
+    let texture_shadow_size_label = create_label!("shadow size");
+    let texture_shadow_size_slider = create_slider!(8.0, 0.0, 255.0, 1.0);
 
     let other_label = create_title_label!("Other");
 
@@ -273,6 +308,10 @@ fn main() {
     let shadow_pos_layout = manager.create(slider_layout);
     let shadow_size_layout = manager.create(slider_layout);
 
+    let texture_size_layout = manager.create(slider_layout);
+    let texture_font_size_layout = manager.create(slider_layout);
+    let texture_shadow_size_layout = manager.create(slider_layout);
+
     let texture_visibility_layout = manager.create(slider_layout);
 
     // Organize views
@@ -334,12 +373,26 @@ fn main() {
 
     // Right drawer
 
+    manager.add_child(right_vbox_layout, texture_label);
+    manager.add_child(right_vbox_layout, texture_size_layout);
+    manager.add_child(right_vbox_layout, texture_font_size_layout);
+    manager.add_child(right_vbox_layout, texture_shadow_size_layout);
+
     manager.add_child(right_vbox_layout, other_label);
     manager.add_child(right_vbox_layout, animation_button);
     manager.add_child(right_vbox_layout, texture_visibility_layout);
 
     manager.add_child(texture_visibility_layout, texture_visibility_slider);
     manager.add_child(texture_visibility_layout, texture_visibility_label);
+
+    manager.add_child(texture_size_layout, texture_size_slider);
+    manager.add_child(texture_size_layout, texture_size_label);
+
+    manager.add_child(texture_font_size_layout, texture_font_size_slider);
+    manager.add_child(texture_font_size_layout, texture_font_size_label);
+
+    manager.add_child(texture_shadow_size_layout, texture_shadow_size_slider);
+    manager.add_child(texture_shadow_size_layout, texture_shadow_size_label);
 
     // Handle font renderer command queues.
     let (renderer_command_sender, renderer_command_receiver) = channel();
@@ -407,7 +460,7 @@ fn main() {
                 }
                 glutin::WindowEvent::MouseWheel { delta, .. } => {
                     let value = match delta {
-                        glutin::MouseScrollDelta::LineDelta(_, y) => y,
+                        glutin::MouseScrollDelta::LineDelta(_, y) => y * 2.0,
                         glutin::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
                     };
                     manager.set_mouse_wheel_delta(Some(value));

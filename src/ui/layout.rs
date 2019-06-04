@@ -120,7 +120,7 @@ pub struct UIVBoxLayout {
 impl UIWidget for UIVBoxLayout {
     type Event = ();
     fn layout(&self, layout: UILayout, children: &mut [UILayout]) {
-        let height = ((layout.height - (children.len() - 1) as f32 * self.vpadding)
+        let height = ((layout.height - (children.len() + 1) as f32 * self.vpadding)
             / children.len() as f32)
             .min(self.max_height)
             .max(self.min_height);
