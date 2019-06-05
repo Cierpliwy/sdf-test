@@ -167,10 +167,11 @@ fn main() {
                 1.0,
                 1.0 / 256.0,
                 $default,
+                2
             ))
         };
-        ($default:expr, $min:expr, $max:expr, $step:expr) => {
-            manager.create(UISlider::new(&slider_context, $min, $max, $step, $default))
+        ($default:expr, $min:expr, $max:expr, $step:expr, $precision:expr) => {
+            manager.create(UISlider::new(&slider_context, $min, $max, $step, $default, $precision))
         };
     };
 
@@ -219,13 +220,13 @@ fn main() {
 
     let texture_size_label = create_label!("size");
     let texture_size_slider =
-        create_slider!(text_area_texture_size as f32, 1024.0, 1024.0 * 8.0, 512.0);
+        create_slider!(text_area_texture_size as f32, 1024.0, 1024.0 * 8.0, 512.0, 0);
 
     let texture_font_size_label = create_label!("font size");
-    let texture_font_size_slider = create_slider!(text_area_font_size as f32, 0.0, 255.0, 1.0);
+    let texture_font_size_slider = create_slider!(text_area_font_size as f32, 16.0, 255.0, 1.0, 0);
 
     let texture_shadow_size_label = create_label!("shadow size");
-    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 1.0, 64.0, 1.0);
+    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 1.0, 64.0, 1.0, 0);
 
     let other_label = create_title_label!("Other");
 

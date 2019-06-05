@@ -42,6 +42,7 @@ pub struct UISlider {
     max_value: f32,
     step_value: f32,
     value: f32,
+    precision: usize,
     drag_value: Option<f32>,
 }
 
@@ -52,6 +53,7 @@ impl UISlider {
         max_value: f32,
         step_value: f32,
         value: f32,
+        precision: usize
     ) -> Self {
         let block = UIBlock::new(
             context.block_context.clone(),
@@ -85,7 +87,7 @@ impl UISlider {
 
         let label = UILabel::new(
             context.label_context.clone(),
-            &format!("{:.2}", value),
+            &format!("{:.*}", precision, value),
             UILabelStyle {
                 size: 15.0,
                 align: UILabelAlignment::Center,
@@ -112,6 +114,7 @@ impl UISlider {
             max_value,
             step_value,
             value,
+            precision,
             drag_value: None,
         }
     }
@@ -299,13 +302,13 @@ impl UIWidget for UISlider {
             let new_value = self.value_from_pos(frame_input.mouse_pos.left, layout);
             if !pressed {
                 self.value = new_value;
-                self.label.set_text(&format!("{:.2}", self.value));
+                self.label.set_text(&format!("{:.*}", self.precision, self.value));
                 self.drag_value = None;
                 events.push(UISliderEvent::ValueFinished(new_value));
             } else {
                 if old_value != new_value {
                     events.push(UISliderEvent::ValueChanged(new_value));
-                    self.label.set_text(&format!("{:.2}", new_value));
+                    self.label.set_text(&format!("{:.*}", self.precision, new_value));
                 }
                 self.drag_value = Some(new_value);
             }
