@@ -64,6 +64,7 @@ pub struct UITextAreaStyle {
     pub shadow_size: f32,
     pub shadow_alpha: f32,
     pub texture_visibility: f32,
+    pub animation: bool,
 }
 
 impl Default for UITextAreaStyle {
@@ -80,6 +81,7 @@ impl Default for UITextAreaStyle {
             shadow_size: 0.0,
             shadow_alpha: 0.0,
             texture_visibility: 0.0,
+            animation: false,
         }
     }
 }
@@ -105,20 +107,24 @@ impl UITextAreaContext {
             in vec2 coord;
 
             out vec2 vCoord;
+            out vec2 vPos;
 
             uniform float uFontSize;
             uniform vec2 uScreen;
             uniform vec2 uPosition;
 
             void main() {
-                gl_Position = vec4((uPosition + pos * uFontSize) * 2.0 / uScreen - 1.0, 0.0, 1.0);
+                vPos = (uPosition + pos * uFontSize) * 2.0 / uScreen - 1.0;
                 vCoord = coord;
+                gl_Position = vec4(vPos, 0.0, 1.0);
             }
         "#,
         fragment: r#"
             #version 140
 
             in vec2 vCoord;
+            in vec2 vPos;
+
             out vec4 color;
 
             uniform sampler2D uTexture;
@@ -131,6 +137,10 @@ impl UITextAreaContext {
             uniform float uShadowSize;
             uniform float uShadowAlpha;
             uniform float uTextureVisibility;
+            uniform vec2 uMouse;
+            uniform bool uAnimation;
+            uniform vec2 uScreen;
+            uniform float uFontSize;
 
             float median(float a, float b, float c) {
                 return max(min(a,b), min(max(a,b),c));
@@ -139,6 +149,11 @@ impl UITextAreaContext {
             void main() {
                 vec4 t = texture(uTexture, vCoord);
                 float d = median(t.r, t.g, t.b);
+
+                if (uAnimation) {
+                    float mouse_dist = length(vPos - (uMouse / uScreen - vec2(0.5)) * 2.0);
+                    d = d * (1.0 + 1.0 * clamp(1.0 - mouse_dist * 2.0, 0.0, 1.0));
+                }
 
                 vec4 outline_color = uColor;
                 float outer_alpha = smoothstep(uOuterDist - uSharpness, uOuterDist + uSharpness, d);
@@ -262,6 +277,8 @@ pub struct UITextArea {
     drag_offset: UIPoint,
     drag_start: Option<UIPoint>,
     zoom: f32,
+    mouse_x: f32,
+    mouse_y: f32,
 }
 
 impl UITextArea {
@@ -280,6 +297,8 @@ impl UITextArea {
             zoom: 1.0,
             passes: HashMap::new(),
             style,
+            mouse_x: 0.0,
+            mouse_y: 0.0,
         }
     }
 
@@ -289,6 +308,13 @@ impl UITextArea {
 
     pub fn set_style(&mut self, style: UITextAreaStyle) {
         self.style = style;
+    }
+
+    pub fn set_text(&mut self, text: &str) {
+        if self.last_text != text {
+            self.last_text = text.into();
+            self.invalidate();
+        }
     }
 
     pub fn invalidate(&mut self) {
@@ -522,7 +548,9 @@ impl UITextArea {
                             uShadowPos: style.shadow_pos,
                             uShadowSize: style.shadow_size,
                             uShadowAlpha: style.shadow_alpha,
-                            uTextureVisibility: style.texture_visibility
+                            uTextureVisibility: style.texture_visibility,
+                            uMouse: [self.mouse_x, self.mouse_y],
+                            uAnimation: self.style.animation
                         },
                         &DrawParameters {
                             blend: Blend::alpha_blending(),
@@ -549,6 +577,10 @@ impl UIWidget for UITextArea {
         frame_input: UIFrameInput,
         _events: &mut Vec<Self::Event>,
     ) {
+
+        self.mouse_x = frame_input.mouse_pos.left;
+        self.mouse_y = frame_input.mouse_pos.top;
+
         if layout.width != self.last_size.width || layout.height != self.last_size.height {
             self.last_size = UISize {
                 width: layout.width,

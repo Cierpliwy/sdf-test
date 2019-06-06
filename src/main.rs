@@ -47,8 +47,8 @@ fn main() {
     .expect("Cannot load UI font");
 
     let text_area_texture_size = 1024;
-    let text_area_font_size = 64;
-    let text_area_shadow_size = 16;
+    let text_area_font_size = 48;
+    let text_area_shadow_size = 4;
 
     let text_area_font = Font::new(
         text_area_texture_size,
@@ -98,7 +98,7 @@ fn main() {
     };
 
     let mut text_style = UITextAreaStyle {
-        text_size: 40.0,
+        text_size: 30.0,
         inner_dist: 0.0,
         outer_dist: 0.55,
         shadow_dist: 1.1,
@@ -107,17 +107,24 @@ fn main() {
         shadow_color: Color::new(0.19, 0.36, 1.0),
         shadow_pos: 0.24,
         shadow_size: 0.21,
-        shadow_alpha: 0.08,
+        shadow_alpha: 0.05,
         texture_visibility: 0.0,
+        animation: false,
     };
 
     let text_area = manager.create(UITextArea::new(
         text_area_context.clone(),
-        r#"Welcome to the MCSDF font demo!
+        r#"Welcome to the multi-channel distance fields font tech demo!
         
-        • Use the left panel to adjust font rendering settings.
-        • Use the right panel to regenerate MCSDF texture.
-        • Type anything you want."#,
+        • Left panel - use it to modify font rendering settings, which update only uniform values used in text shaders.
+        
+        • Right panel - use it to modify font texture, which affects the quality of glyphs. Make sure to check out animation as well :)
+        
+        • Mouse/scroll - use it to move and zoom a text in the center.
+        
+        • Keyboard - use to type anything you want.
+        
+        Enjoy!"#,
         text_style,
     ));
 
@@ -436,7 +443,7 @@ fn main() {
     });
 
     let mut exit = false;
-    let mut scale = false;
+    let mut text = String::new();
 
     while !exit {
         // Update widgets
@@ -475,9 +482,23 @@ fn main() {
         manager.set_mouse_wheel_delta(None);
         events_loop.poll_events(|event| match event {
             glutin::Event::WindowEvent { event, .. } => match event {
+                glutin::WindowEvent::ReceivedCharacter(c) => {
+                    if (!c.is_whitespace() && c != '\x08') || c == ' ' {
+                        text.push(c);
+                    }
+                    manager.update(text_area, |t| {
+                        t.set_text(&text);
+                    });
+                }
                 glutin::WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(glutin::VirtualKeyCode::Escape) = input.virtual_keycode {
                         exit = true;
+                    }
+                    if let Some(glutin::VirtualKeyCode::Back) = input.virtual_keycode {
+                        text.pop();
+                    }
+                    if let Some(glutin::VirtualKeyCode::Return) = input.virtual_keycode {
+                        text.push('\n');
                     }
                 }
                 glutin::WindowEvent::CursorMoved { position, .. } => {
@@ -515,16 +536,10 @@ fn main() {
                         height: position.height as f32,
                     });
                 }
-                glutin::WindowEvent::ReceivedCharacter(c) => {
-                    if c == 's' {
-                        scale = !scale;
-                    }
-                }
                 _ => (),
             },
             glutin::Event::Awakened => {
-                let result = renderer_result_receiver.try_recv();
-                if let Ok(result) = result {
+                while let Ok(result) = renderer_result_receiver.try_recv() {
                     match result {
                         RendererResult::ShapesRendered(name, batch, avg_duration) => {
                             let texture = batch.texture.lock().unwrap();
@@ -639,6 +654,15 @@ fn main() {
         handle_texture_setting!(texture_size_slider, set_texture_size);
         handle_texture_setting!(texture_font_size_slider, set_font_size);
         handle_texture_setting!(texture_shadow_size_slider, set_shadow_size);
+
+        manager.poll_events(animation_button, |e| match e {
+            UIButtonEvent::Toggled(toggled) => {
+                text_style = UITextAreaStyle {
+                    animation: *toggled,
+                    ..text_style
+                };
+            }
+        });
     }
 
     renderer_command_sender
