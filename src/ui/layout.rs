@@ -135,6 +135,33 @@ impl UIWidget for UIVBoxLayout {
     }
 }
 
+// ============ HBox Layout =========================================================
+
+#[derive(Copy, Clone)]
+pub struct UIHBoxLayout {
+    pub hpadding: f32,
+    pub vpadding: f32,
+    pub min_width: f32,
+    pub max_width: f32,
+}
+
+impl UIWidget for UIHBoxLayout {
+    type Event = ();
+    fn layout(&self, layout: UILayout, children: &mut [UILayout]) {
+        let width = ((layout.width - (children.len() + 1) as f32 * self.hpadding)
+            / children.len() as f32)
+            .min(self.max_width)
+            .max(self.min_width);
+
+        for (index, child) in children.iter_mut().enumerate() {
+            child.left = layout.left + self.hpadding + index as f32 * width;
+            child.width = width;
+            child.height = layout.height - 2.0 * self.vpadding;
+            child.top = layout.top + self.vpadding;
+        }
+    }
+}
+
 // ============ Slider Layout =========================================================
 
 #[derive(Copy, Clone)]

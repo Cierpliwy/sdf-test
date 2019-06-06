@@ -84,7 +84,12 @@ fn main() {
         opacity: 1.0,
     };
 
-    let titile_label_style = UILabelStyle {
+    let label_right_style = UILabelStyle {
+        align: UILabelAlignment::Right,
+        ..label_style
+    };
+
+    let title_label_style = UILabelStyle {
         size: 25.0,
         align: UILabelAlignment::Center,
         color: [1.0, 1.0, 1.0, 1.0],
@@ -133,13 +138,9 @@ fn main() {
     let right_drawer_block =
         manager.create(UIBlock::new(block_context.clone(), drawer_block_style));
 
-    macro_rules! create_title_label {
-        ($text:expr) => {
-            manager.create(UILabel::new(
-                label_context.clone(),
-                $text,
-                titile_label_style,
-            ))
+    macro_rules! create_styled_label {
+        ($text:expr, $style:expr) => {
+            manager.create(UILabel::new(label_context.clone(), $text, $style))
         };
     };
 
@@ -167,16 +168,23 @@ fn main() {
                 1.0,
                 1.0 / 256.0,
                 $default,
-                2
+                2,
             ))
         };
         ($default:expr, $min:expr, $max:expr, $step:expr, $precision:expr) => {
-            manager.create(UISlider::new(&slider_context, $min, $max, $step, $default, $precision))
+            manager.create(UISlider::new(
+                &slider_context,
+                $min,
+                $max,
+                $step,
+                $default,
+                $precision,
+            ))
         };
     };
 
     // Create UI elements
-    let outline_label = create_title_label!("Outline");
+    let outline_label = create_styled_label!("Outline", title_label_style);
 
     let red_label = create_label!("red", 0.988, 0.576, 0.576);
     let red_slider = create_slider!(text_style.text_color.r);
@@ -196,7 +204,7 @@ fn main() {
     let sharpness_label = create_label!("sharpness");
     let sharpness_slider = create_slider!(text_style.sharpness);
 
-    let shadow_label = create_title_label!("Shadow");
+    let shadow_label = create_styled_label!("Shadow", title_label_style);
 
     let shadow_red_label = create_label!("red", 0.988, 0.576, 0.576);
     let shadow_red_slider = create_slider!(text_style.shadow_color.r);
@@ -207,7 +215,7 @@ fn main() {
     let shadow_blue_label = create_label!("blue", 0.716, 0.708, 0.933);
     let shadow_blue_slider = create_slider!(text_style.shadow_color.g);
 
-    let shadow_alpha_label = create_label!("alpha");
+    let shadow_alpha_label = create_label!("opacity");
     let shadow_alpha_slider = create_slider!(text_style.shadow_alpha);
 
     let shadow_pos_label = create_label!("position");
@@ -216,19 +224,33 @@ fn main() {
     let shadow_size_label = create_label!("size");
     let shadow_size_slider = create_slider!(text_style.shadow_size);
 
-    let texture_label = create_title_label!("Texture");
+    let texture_label = create_styled_label!("Texture", title_label_style);
 
     let texture_size_label = create_label!("size");
-    let texture_size_slider =
-        create_slider!(text_area_texture_size as f32, 1024.0, 1024.0 * 8.0, 512.0, 0);
+    let texture_size_slider = create_slider!(
+        text_area_texture_size as f32,
+        1024.0,
+        1024.0 * 8.0,
+        512.0,
+        0
+    );
 
     let texture_font_size_label = create_label!("font size");
     let texture_font_size_slider = create_slider!(text_area_font_size as f32, 16.0, 255.0, 1.0, 0);
 
     let texture_shadow_size_label = create_label!("shadow size");
-    let texture_shadow_size_slider = create_slider!(text_area_shadow_size as f32, 1.0, 64.0, 1.0, 0);
+    let texture_shadow_size_slider =
+        create_slider!(text_area_shadow_size as f32, 1.0, 64.0, 1.0, 0);
 
-    let other_label = create_title_label!("Other");
+    let render_stats_label = create_styled_label!("Render stats", title_label_style);
+
+    let render_glyph_label = create_label!("Avg. glyph render time:");
+    let render_glyph_value_label = create_styled_label!("-", label_right_style);
+
+    let render_texture_label = create_label!("Avg. texture copy time:");
+    let render_texture_value_label = create_styled_label!("-", label_right_style);
+
+    let other_label = create_styled_label!("Other", title_label_style);
 
     let texture_visibility_label = create_label!("texture visibility");
     let texture_visibility_slider = create_slider!(text_style.texture_visibility);
@@ -238,8 +260,8 @@ fn main() {
     // Create screen layout
     let main_layout = manager.create(UIMainLayout {
         padding: 20.0,
-        min_width: 150.0,
-        max_width: 300.0,
+        min_width: 300.0,
+        max_width: 400.0,
         ratio: 0.3,
     });
 
@@ -279,6 +301,13 @@ fn main() {
         vpadding: 8.0,
     });
 
+    let hbox_layout = UIHBoxLayout {
+        min_width: std::f32::MIN,
+        max_width: std::f32::MAX,
+        hpadding: 5.0,
+        vpadding: 0.0,
+    };
+
     let slider_layout = UISliderLayout { label_offset: 20.0 };
     let red_layout = manager.create(slider_layout);
     let green_layout = manager.create(slider_layout);
@@ -298,9 +327,13 @@ fn main() {
     let texture_font_size_layout = manager.create(slider_layout);
     let texture_shadow_size_layout = manager.create(slider_layout);
 
+    let render_glyph_layout = manager.create(hbox_layout);
+    let render_texture_layout = manager.create(hbox_layout);
+
     let texture_visibility_layout = manager.create(slider_layout);
 
     // Organize views
+
     manager.root(main_layout);
     manager.add_child(main_layout, left_drawer_layout);
     manager.add_child(left_drawer_layout, left_drawer_block);
@@ -312,6 +345,12 @@ fn main() {
 
     manager.add_child(left_drawer_layout, left_vbox_layout);
     manager.add_child(right_drawer_layout, right_vbox_layout);
+
+    manager.add_child(render_glyph_layout, render_glyph_label);
+    manager.add_child(render_glyph_layout, render_glyph_value_label);
+
+    manager.add_child(render_texture_layout, render_texture_label);
+    manager.add_child(render_texture_layout, render_texture_value_label);
 
     // Left drawer
 
@@ -363,6 +402,10 @@ fn main() {
     manager.add_child(right_vbox_layout, texture_size_layout);
     manager.add_child(right_vbox_layout, texture_font_size_layout);
     manager.add_child(right_vbox_layout, texture_shadow_size_layout);
+
+    manager.add_child(right_vbox_layout, render_stats_label);
+    manager.add_child(right_vbox_layout, render_glyph_layout);
+    manager.add_child(right_vbox_layout, render_texture_layout);
 
     manager.add_child(right_vbox_layout, other_label);
     manager.add_child(right_vbox_layout, animation_button);
@@ -483,7 +526,7 @@ fn main() {
                 let result = renderer_result_receiver.try_recv();
                 if let Ok(result) = result {
                     match result {
-                        RendererResult::ShapesRendered(name, batch) => {
+                        RendererResult::ShapesRendered(name, batch, avg_duration) => {
                             let texture = batch.texture.lock().unwrap();
                             let texture_upload_time = Instant::now();
 
@@ -495,13 +538,19 @@ fn main() {
                             }
 
                             if name == "text_area_context" {
+                                manager.update(render_glyph_value_label, |l| {
+                                    l.set_text(&format!("{:?}", avg_duration));
+                                });
+
                                 text_area_context
                                     .borrow_mut()
                                     .update_texture_cache(batch.texture_id, &texture)
                                     .expect("Couldn't upload texture to text area context");
-                            }
 
-                            println!("Texture uploaded in {:?}.", texture_upload_time.elapsed());
+                                manager.update(render_texture_value_label, |l| {
+                                    l.set_text(&format!("{:?}", texture_upload_time.elapsed()));
+                                });
+                            }
                         }
                     }
                 }

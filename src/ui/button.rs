@@ -62,7 +62,7 @@ impl UIButton {
                 align: UILabelAlignment::Center,
                 color: [0.0, 0.0, 0.0, 1.0],
                 shadow_color: [0.0, 0.0, 0.0, 1.0],
-                opacity: 1.0
+                opacity: 1.0,
             },
         );
 

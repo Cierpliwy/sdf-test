@@ -168,7 +168,8 @@ impl UITextAreaContext {
     }
 
     pub fn set_texture_size(&mut self, texture_size: f32) {
-        self.font.set_texture_size(texture_size as u32, texture_size as u32);
+        self.font
+            .set_texture_size(texture_size as u32, texture_size as u32);
         self.invalidate();
     }
 
@@ -260,7 +261,7 @@ pub struct UITextArea {
     offset: UIPoint,
     drag_offset: UIPoint,
     drag_start: Option<UIPoint>,
-    zoom: f32
+    zoom: f32,
 }
 
 impl UITextArea {

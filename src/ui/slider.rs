@@ -53,7 +53,7 @@ impl UISlider {
         max_value: f32,
         step_value: f32,
         value: f32,
-        precision: usize
+        precision: usize,
     ) -> Self {
         let block = UIBlock::new(
             context.block_context.clone(),
@@ -302,13 +302,15 @@ impl UIWidget for UISlider {
             let new_value = self.value_from_pos(frame_input.mouse_pos.left, layout);
             if !pressed {
                 self.value = new_value;
-                self.label.set_text(&format!("{:.*}", self.precision, self.value));
+                self.label
+                    .set_text(&format!("{:.*}", self.precision, self.value));
                 self.drag_value = None;
                 events.push(UISliderEvent::ValueFinished(new_value));
             } else {
                 if old_value != new_value {
                     events.push(UISliderEvent::ValueChanged(new_value));
-                    self.label.set_text(&format!("{:.*}", self.precision, new_value));
+                    self.label
+                        .set_text(&format!("{:.*}", self.precision, new_value));
                 }
                 self.drag_value = Some(new_value);
             }
