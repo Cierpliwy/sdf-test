@@ -483,8 +483,7 @@ fn main() {
         events_loop.poll_events(|event| match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::ReceivedCharacter(c) => {
-                    if (!c.is_whitespace() && c != '\x08' &&  c != '\x7f') || c == ' ' {
-                        println!("{}", c as u32);
+                    if (!c.is_whitespace() && c != '\x08' && c != '\x7f') || c == ' ' {
                         text.push(c);
                     }
                     manager.update(text_area, |t| {
@@ -492,14 +491,27 @@ fn main() {
                     });
                 }
                 glutin::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(glutin::VirtualKeyCode::Escape) = input.virtual_keycode {
-                        exit = true;
-                    }
-                    if let Some(glutin::VirtualKeyCode::Back) = input.virtual_keycode {
-                        text.pop();
-                    }
-                    if let Some(glutin::VirtualKeyCode::Return) = input.virtual_keycode {
-                        text.push('\n');
+                    if input.state == glutin::ElementState::Pressed {
+                        let update = match input.virtual_keycode {
+                            Some(glutin::VirtualKeyCode::Escape) => {
+                                exit = true;
+                                false
+                            }
+                            Some(glutin::VirtualKeyCode::Back) => {
+                                text.pop();
+                                true
+                            }
+                            Some(glutin::VirtualKeyCode::Return) => {
+                                text.push('\n');
+                                true
+                            }
+                            _ => false,
+                        };
+                        if update {
+                            manager.update(text_area, |t| {
+                                t.set_text(&text);
+                            });
+                        }
                     }
                 }
                 glutin::WindowEvent::CursorMoved { position, .. } => {

@@ -577,7 +577,6 @@ impl UIWidget for UITextArea {
         frame_input: UIFrameInput,
         _events: &mut Vec<Self::Event>,
     ) {
-
         self.mouse_x = frame_input.mouse_pos.left;
         self.mouse_y = frame_input.mouse_pos.top;
 
