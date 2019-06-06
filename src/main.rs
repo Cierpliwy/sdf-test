@@ -483,7 +483,8 @@ fn main() {
         events_loop.poll_events(|event| match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::ReceivedCharacter(c) => {
-                    if (!c.is_whitespace() && c != '\x08') || c == ' ' {
+                    if (!c.is_whitespace() && c != '\x08' &&  c != '\x7f') || c == ' ' {
+                        println!("{}", c as u32);
                         text.push(c);
                     }
                     manager.update(text_area, |t| {
