@@ -26,7 +26,7 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
-        .with_title("Multi-channel Signed Distance Field Font Demo");
+        .with_title("Multi-channel Signed Distance Fields Font Demo");
     let context = glutin::ContextBuilder::new().with_vsync(true);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
@@ -100,7 +100,7 @@ fn main() {
     let mut text_style = UITextAreaStyle {
         text_size: 30.0,
         inner_dist: 0.0,
-        outer_dist: 0.55,
+        outer_dist: 0.51,
         shadow_dist: 1.1,
         sharpness: 0.4,
         text_color: Color::new(1.0, 1.0, 1.0),
