@@ -7,5 +7,5 @@ edition = "2018"
 [dependencies]
 rayon = "1.0.3"
 glium = "0.22.0"
-sdf = { path = "./libs/sdf" }
+sdf = { path = "./libs/sdf", version = "0.1.0" }
 
