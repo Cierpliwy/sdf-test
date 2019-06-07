@@ -6,6 +6,10 @@
 
 Multi-channel signed distance fields is a technique, which rasterizes glyphs with distance information to low-resolution texture, which is then used to render high-quality text. You can find more information about it [here](https://steamcdn-a.akamaihd.net/apps/valve/2007/SIGGRAPH2007_AlphaTestedMagnification.pdf) and [here](https://dspace.cvut.cz/bitstream/handle/10467/62770/F8-DP-2015-Chlumsky-Viktor-thesis.pdf).
 
+## Installation
+
+Download and install [Rust toolchain](https://rustup.rs/) and type: `cargo install mcsdf-font-tech-demo`.
+
 ## Goals
 
 - Create a Rust tech demo to showcase a technique.
