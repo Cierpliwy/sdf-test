@@ -323,6 +323,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcsdf-font-tech-demo"
+version = "1.0.0"
+dependencies = [
+ "glium 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sdf 0.1.0",
+]
+
+[[package]]
 name = "memmap"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -533,15 +542,6 @@ version = "0.1.0"
 dependencies = [
  "cgmath 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusttype 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "sdf-test"
-version = "0.1.0"
-dependencies = [
- "glium 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "sdf 0.1.0",
 ]
 
 [[package]]
