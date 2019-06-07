@@ -1,5 +1,5 @@
 /target
-/libs/sdf/target
+/libs/mcsdf/target
 **/*.rs.bk
 /.vscode
 /.idea
