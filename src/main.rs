@@ -13,7 +13,7 @@ use crate::ui::text_area::*;
 use crate::ui::widget::*;
 
 use glium::{glutin, Surface};
-use sdf::font::Font;
+use mcsdf::font::Font;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::channel;

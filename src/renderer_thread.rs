@@ -1,7 +1,7 @@
 use glium::glutin::EventsLoopProxy;
 use rayon::prelude::*;
-use sdf::font::TextureRenderBatch;
-use sdf::renderer::render_shape;
+use mcsdf::font::TextureRenderBatch;
+use mcsdf::renderer::render_shape;
 use std::sync::mpsc::{Receiver, RecvError, Sender};
 use std::time::Instant;
 

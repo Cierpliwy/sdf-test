@@ -7,9 +7,9 @@ use glium::{
     implement_vertex, program, uniform, Blend, Frame, IndexBuffer, Program, Rect as GLRect,
     Surface, VertexBuffer,
 };
-use sdf::font::{Font, GlyphLayout, TextureRenderBatch};
-use sdf::geometry::Rect;
-use sdf::texture::Texture;
+use mcsdf::font::{Font, GlyphLayout, TextureRenderBatch};
+use mcsdf::geometry::Rect;
+use mcsdf::texture::Texture;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;

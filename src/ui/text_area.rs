@@ -8,8 +8,8 @@ use glium::{
     implement_vertex, program, uniform, Blend, Frame, IndexBuffer, Program, Rect as GLRect,
     Surface, VertexBuffer,
 };
-use sdf::font::{Font, TextBlockLayout, TextureRenderBatch};
-use sdf::texture::Texture;
+use mcsdf::font::{Font, TextBlockLayout, TextureRenderBatch};
+use mcsdf::texture::Texture;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;

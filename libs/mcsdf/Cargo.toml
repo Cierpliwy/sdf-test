@@ -1,5 +1,5 @@
 [package]
-name = "sdf"
+name = "mcsdf"
 version = "0.1.0"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
 edition = "2018"

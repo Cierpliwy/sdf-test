@@ -323,12 +323,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcsdf"
+version = "0.1.0"
+dependencies = [
+ "cgmath 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusttype 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "mcsdf-font-tech-demo"
 version = "1.0.0"
 dependencies = [
  "glium 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mcsdf 0.1.0",
  "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "sdf 0.1.0",
 ]
 
 [[package]]
@@ -535,14 +543,6 @@ dependencies = [
 name = "scopeguard"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "sdf"
-version = "0.1.0"
-dependencies = [
- "cgmath 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rusttype 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "semver"
