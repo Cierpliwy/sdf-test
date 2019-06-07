@@ -3,6 +3,8 @@ name = "mcsdf-font-tech-demo"
 version = "1.0.0"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "Multi-channel signed distance fields font tech demo"
 
 [dependencies]
 rayon = "1.0.3"
