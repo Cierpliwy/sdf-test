@@ -26,11 +26,13 @@ where
 
     event_loop.run(move |event, _, control_flow| {
         let run_callback = match event.to_static() {
-            Some(glutin::event::Event::NewEvents(cause)) => match cause {
-                glutin::event::StartCause::ResumeTimeReached { .. }
-                | glutin::event::StartCause::Init => true,
-                _ => false,
-            },
+            Some(glutin::event::Event::NewEvents(cause)) => {
+                matches!(
+                    cause,
+                    glutin::event::StartCause::ResumeTimeReached { .. }
+                        | glutin::event::StartCause::Init
+                )
+            }
             Some(event) => {
                 events_buffer.push(event);
                 false
