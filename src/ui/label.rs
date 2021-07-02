@@ -74,8 +74,8 @@ impl UILabelContext {
         .expect("Cannot create program for label");
 
         Self {
-            program,
             context,
+            program,
             font,
             texture_cache,
         }
@@ -232,7 +232,7 @@ impl UILabel {
         struct PassData {
             vertices: Vec<UILabelGlyphVertex>,
             indices: Vec<u16>,
-        };
+        }
 
         fn update_pass_data(pass_data: &mut PassData, glyph_layout: &GlyphLayout) {
             let new_index = pass_data.vertices.len();

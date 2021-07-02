@@ -206,7 +206,7 @@ impl<T: UIWidget> UIWidgetData for UITypedWidgetData<T> {
 
 pub struct UIWidgetManager {
     screen: UISize,
-    widgets: Vec<Box<UIWidgetData>>,
+    widgets: Vec<Box<dyn UIWidgetData>>,
     root: Option<UIWidgetId>,
     frame_input: UIFrameInput,
 }

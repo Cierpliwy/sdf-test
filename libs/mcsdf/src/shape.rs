@@ -96,13 +96,15 @@ impl<'a> FromIterator<Segment> for Shape {
             match mask {
                 0b110 => 0b011,
                 0b011 => 0b101,
-                _ => if remaining_segments == 0 {
-                    0b011
-                } else {
-                    0b110
-                },
+                _ => {
+                    if remaining_segments == 0 {
+                        0b011
+                    } else {
+                        0b110
+                    }
+                }
             }
-        };
+        }
 
         let mut iter = segments.into_iter();
         while let Some(segment) = iter.next() {

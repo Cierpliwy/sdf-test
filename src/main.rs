@@ -22,18 +22,23 @@ use std::time::Instant;
 
 fn main() {
     // Create GL objects
-    let screen_dim = [1400.0, 900.0];
-    let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new()
-        .with_dimensions((f64::from(screen_dim[0]), f64::from(screen_dim[1])).into())
+    let screen_dim = glutin::dpi::LogicalSize {
+        width: 1400.0,
+        height: 900.0,
+    };
+
+    let event_loop = glutin::event_loop::EventLoop::new();
+    let window = glutin::window::WindowBuilder::new()
+        .with_inner_size(screen_dim)
         .with_title("Multi-channel Signed Distance Fields Font Demo");
     let context = glutin::ContextBuilder::new().with_vsync(true);
-    let display = glium::Display::new(window, context, &events_loop).unwrap();
+    let display = glium::Display::new(window, context, &event_loop).unwrap();
+    let mut current_scale_factor = display.gl_window().window().scale_factor();
 
     // Create state
     let mut manager = UIWidgetManager::new(UISize {
-        width: screen_dim[0],
-        height: screen_dim[1],
+        width: screen_dim.width,
+        height: screen_dim.height,
     });
 
     // Create fonts
@@ -123,6 +128,8 @@ fn main() {
         • Mouse/scroll - use it to move and zoom a text in the center.
         
         • Keyboard - use to type anything you want.
+
+        • Close - Press ESC to close application.
         
         Enjoy!"#,
         text_style,
@@ -141,15 +148,13 @@ fn main() {
     };
 
     let left_drawer_block = manager.create(UIBlock::new(block_context.clone(), drawer_block_style));
-
-    let right_drawer_block =
-        manager.create(UIBlock::new(block_context.clone(), drawer_block_style));
+    let right_drawer_block = manager.create(UIBlock::new(block_context, drawer_block_style));
 
     macro_rules! create_styled_label {
         ($text:expr, $style:expr) => {
             manager.create(UILabel::new(label_context.clone(), $text, $style))
         };
-    };
+    }
 
     macro_rules! create_label {
         ($text:expr) => {
@@ -165,7 +170,7 @@ fn main() {
                 },
             ))
         };
-    };
+    }
 
     macro_rules! create_slider {
         ($default:expr) => {
@@ -188,7 +193,7 @@ fn main() {
                 $precision,
             ))
         };
-    };
+    }
 
     // Create UI elements
     let outline_label = create_styled_label!("Outline", title_label_style);
@@ -436,16 +441,15 @@ fn main() {
     let renderer_context = RendererContext {
         receiver: renderer_command_receiver,
         sender: renderer_result_sender,
-        proxy: events_loop.create_proxy(),
+        proxy: event_loop.create_proxy(),
     };
-    let renderer_thread = thread::spawn(|| {
+
+    let mut renderer_thread = Some(thread::spawn(|| {
         renderer_entry_point(renderer_context).expect("Got an error on renderer thread");
-    });
+    }));
 
-    let mut exit = false;
     let mut text = String::new();
-
-    while !exit {
+    utils::start_loop(event_loop, move |events| {
         // Update widgets
         manager.update(text_area, |t| {
             t.set_style(text_style);
@@ -479,112 +483,122 @@ fn main() {
         }
 
         // Handle window events
+        let mut exit = false;
         manager.set_mouse_wheel_delta(None);
-        events_loop.poll_events(|event| match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::ReceivedCharacter(c) => {
-                    if (!c.is_whitespace() && c != '\x08' && c != '\x7f') || c == ' ' {
-                        text.push(c);
+
+        for event in events {
+            match event {
+                glutin::event::Event::WindowEvent { event, .. } => match event {
+                    glutin::event::WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                        dbg!(scale_factor);
+                        current_scale_factor = *scale_factor
                     }
-                    manager.update(text_area, |t| {
-                        t.set_text(&text);
-                    });
-                }
-                glutin::WindowEvent::KeyboardInput { input, .. } => {
-                    if input.state == glutin::ElementState::Pressed {
-                        let update = match input.virtual_keycode {
-                            Some(glutin::VirtualKeyCode::Escape) => {
-                                exit = true;
-                                false
+                    glutin::event::WindowEvent::ReceivedCharacter(c) => {
+                        if (!c.is_whitespace() && *c != '\x08' && *c != '\x7f') || *c == ' ' {
+                            text.push(*c);
+                        }
+                        manager.update(text_area, |t| {
+                            t.set_text(&text);
+                        });
+                    }
+                    glutin::event::WindowEvent::KeyboardInput { input, .. } => {
+                        if input.state == glutin::event::ElementState::Pressed {
+                            let update = match input.virtual_keycode {
+                                Some(glutin::event::VirtualKeyCode::Escape) => {
+                                    exit = true;
+                                    false
+                                }
+                                Some(glutin::event::VirtualKeyCode::Back) => {
+                                    text.pop();
+                                    true
+                                }
+                                Some(glutin::event::VirtualKeyCode::Return) => {
+                                    text.push('\n');
+                                    true
+                                }
+                                _ => false,
+                            };
+                            if update {
+                                manager.update(text_area, |t| {
+                                    t.set_text(&text);
+                                });
                             }
-                            Some(glutin::VirtualKeyCode::Back) => {
-                                text.pop();
-                                true
-                            }
-                            Some(glutin::VirtualKeyCode::Return) => {
-                                text.push('\n');
-                                true
-                            }
-                            _ => false,
-                        };
-                        if update {
-                            manager.update(text_area, |t| {
-                                t.set_text(&text);
-                            });
                         }
                     }
-                }
-                glutin::WindowEvent::CursorMoved { position, .. } => {
-                    let height = manager.get_screen().height;
-                    manager.set_mouse_pos(UIPoint {
-                        left: position.x as f32,
-                        top: height - position.y as f32,
-                    });
-                }
-                glutin::WindowEvent::MouseWheel { delta, .. } => {
-                    let value = match delta {
-                        glutin::MouseScrollDelta::LineDelta(_, y) => y * 2.0,
-                        glutin::MouseScrollDelta::PixelDelta(pos) => pos.y as f32,
-                    };
-                    manager.set_mouse_wheel_delta(Some(value));
-                }
-                glutin::WindowEvent::MouseInput {
-                    button: b,
-                    state: button_state,
-                    ..
-                } => {
-                    manager.set_left_mouse_button_pressed(
-                        b == glutin::MouseButton::Left
-                            && button_state == glutin::ElementState::Pressed,
-                    );
-                    manager.set_right_mouse_button_pressed(
-                        b == glutin::MouseButton::Right
-                            && button_state == glutin::ElementState::Pressed,
-                    );
-                }
-                glutin::WindowEvent::CloseRequested => exit = true,
-                glutin::WindowEvent::Resized(position) => {
-                    manager.set_screen(UISize {
-                        width: position.width as f32,
-                        height: position.height as f32,
-                    });
+                    glutin::event::WindowEvent::CursorMoved { position, .. } => {
+                        let height = manager.get_screen().height;
+                        manager.set_mouse_pos(UIPoint {
+                            left: position.to_logical::<f32>(current_scale_factor).x,
+                            top: height - position.to_logical::<f32>(current_scale_factor).y,
+                        });
+                    }
+                    glutin::event::WindowEvent::MouseWheel { delta, .. } => {
+                        let value = match delta {
+                            glutin::event::MouseScrollDelta::LineDelta(_, y) => y * 2.0,
+                            glutin::event::MouseScrollDelta::PixelDelta(pos) => {
+                                pos.to_logical::<f32>(current_scale_factor).y
+                            }
+                        };
+                        manager.set_mouse_wheel_delta(Some(value));
+                    }
+                    glutin::event::WindowEvent::MouseInput {
+                        button: b,
+                        state: button_state,
+                        ..
+                    } => {
+                        manager.set_left_mouse_button_pressed(
+                            *b == glutin::event::MouseButton::Left
+                                && *button_state == glutin::event::ElementState::Pressed,
+                        );
+                        manager.set_right_mouse_button_pressed(
+                            *b == glutin::event::MouseButton::Right
+                                && *button_state == glutin::event::ElementState::Pressed,
+                        );
+                    }
+                    glutin::event::WindowEvent::CloseRequested => exit = true,
+                    glutin::event::WindowEvent::Resized(position) => {
+                        manager.set_screen(UISize {
+                            width: position.to_logical::<f32>(current_scale_factor).width,
+                            height: position.to_logical::<f32>(current_scale_factor).height,
+                        });
+                    }
+                    _ => (),
+                },
+                glutin::event::Event::UserEvent(()) => {
+                    while let Ok(result) = renderer_result_receiver.try_recv() {
+                        match result {
+                            RendererResult::ShapesRendered(name, batch, avg_duration) => {
+                                let texture = batch.texture.lock().unwrap();
+                                let texture_upload_time = Instant::now();
+
+                                if name == "label_context" {
+                                    label_context
+                                        .borrow_mut()
+                                        .update_texture_cache(batch.texture_id, &texture)
+                                        .expect("Coudn't upload texture to label context");
+                                }
+
+                                if name == "text_area_context" {
+                                    manager.update(render_glyph_value_label, |l| {
+                                        l.set_text(&format!("{:?}", avg_duration));
+                                    });
+
+                                    text_area_context
+                                        .borrow_mut()
+                                        .update_texture_cache(batch.texture_id, &texture)
+                                        .expect("Couldn't upload texture to text area context");
+
+                                    manager.update(render_texture_value_label, |l| {
+                                        l.set_text(&format!("{:?}", texture_upload_time.elapsed()));
+                                    });
+                                }
+                            }
+                        }
+                    }
                 }
                 _ => (),
-            },
-            glutin::Event::Awakened => {
-                while let Ok(result) = renderer_result_receiver.try_recv() {
-                    match result {
-                        RendererResult::ShapesRendered(name, batch, avg_duration) => {
-                            let texture = batch.texture.lock().unwrap();
-                            let texture_upload_time = Instant::now();
-
-                            if name == "label_context" {
-                                label_context
-                                    .borrow_mut()
-                                    .update_texture_cache(batch.texture_id, &texture)
-                                    .expect("Coudn't upload texture to label context");
-                            }
-
-                            if name == "text_area_context" {
-                                manager.update(render_glyph_value_label, |l| {
-                                    l.set_text(&format!("{:?}", avg_duration));
-                                });
-
-                                text_area_context
-                                    .borrow_mut()
-                                    .update_texture_cache(batch.texture_id, &texture)
-                                    .expect("Couldn't upload texture to text area context");
-
-                                manager.update(render_texture_value_label, |l| {
-                                    l.set_text(&format!("{:?}", texture_upload_time.elapsed()));
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            _ => (),
-        });
+            };
+        }
 
         // Handle font style
         macro_rules! handle_font_style_slider {
@@ -603,7 +617,6 @@ fn main() {
         }
 
         // Handle left panel actions.
-
         handle_font_style_slider!(red_slider, text_color, |v: f32| Color::new(
             v,
             text_style.text_color.g,
@@ -643,7 +656,6 @@ fn main() {
         handle_font_style_slider!(shadow_alpha_slider, shadow_alpha, |v: f32| v);
 
         // Handle right panel actions.
-
         handle_font_style_slider!(texture_visibility_slider, texture_visibility, |v: f32| v);
 
         macro_rules! handle_texture_setting {
@@ -662,7 +674,7 @@ fn main() {
                     });
                 }
             };
-        };
+        }
 
         handle_texture_setting!(texture_size_slider, set_texture_size);
         handle_texture_setting!(texture_font_size_slider, set_font_size);
@@ -676,13 +688,21 @@ fn main() {
                 };
             }
         });
-    }
 
-    renderer_command_sender
-        .send(RendererCommand::Exit)
-        .expect("Coudn't terminate renderer thread before exit.");
+        return if exit {
+            renderer_command_sender
+                .send(RendererCommand::Exit)
+                .expect("Coudn't terminate renderer thread before exit.");
 
-    renderer_thread
-        .join()
-        .expect("Couldn't join renderer thread");
+            renderer_thread
+                .take()
+                .unwrap()
+                .join()
+                .expect("Couldn't join renderer thread");
+
+            utils::Action::Stop
+        } else {
+            utils::Action::Continue
+        };
+    });
 }

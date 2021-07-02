@@ -1,13 +1,13 @@
 [package]
 name = "mcsdf-font-tech-demo"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Przemysław Lenart <przemek.lenart@gmail.com>"]
 edition = "2018"
 license = "MIT"
 description = "Multi-channel signed distance fields font tech demo"
 
 [dependencies]
-rayon = "1.0.3"
-glium = "0.22.0"
+rayon = "1.5.1"
+glium = "0.30.0"
 mcsdf = { path = "./libs/mcsdf", version = "0.1.0" }
 

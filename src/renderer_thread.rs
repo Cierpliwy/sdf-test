@@ -1,14 +1,14 @@
-use glium::glutin::EventsLoopProxy;
-use rayon::prelude::*;
+use glium::glutin::event_loop::EventLoopProxy;
 use mcsdf::font::TextureRenderBatch;
 use mcsdf::renderer::render_shape;
+use rayon::prelude::*;
 use std::sync::mpsc::{Receiver, RecvError, Sender};
 use std::time::Instant;
 
 pub struct RendererContext {
     pub receiver: Receiver<RendererCommand>,
     pub sender: Sender<RendererResult>,
-    pub proxy: EventsLoopProxy,
+    pub proxy: EventLoopProxy<()>,
 }
 
 pub enum RendererCommand {
@@ -52,7 +52,7 @@ pub fn renderer_entry_point(context: RendererContext) -> Result<(), RecvError> {
             }
         };
 
-        context.proxy.wakeup().unwrap_or_else(|_| {
+        context.proxy.send_event(()).unwrap_or_else(|_| {
             println!("Coudn't wakeup main thread!");
         });
     }

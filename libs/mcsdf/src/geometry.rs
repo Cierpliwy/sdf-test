@@ -190,7 +190,7 @@ impl Curve {
             dist2: f32,
             t: f32,
             pt: Vector2<f32>,
-        };
+        }
 
         let mut dist_result = DistResult {
             dist2: MAX,

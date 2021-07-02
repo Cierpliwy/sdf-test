@@ -171,8 +171,8 @@ impl UITextAreaContext {
         .expect("Cannot create program for text area");
 
         Self {
-            program,
             context,
+            program,
             font,
             texture_cache,
         }
@@ -324,7 +324,7 @@ impl UITextArea {
             End,
             NewLine,
             Word(&'a str),
-        };
+        }
 
         struct ProcessTextCtx {
             line_y: f32,
@@ -336,11 +336,11 @@ impl UITextArea {
         struct PassData {
             vertices: Vec<UITextAreaGlyphVertex>,
             indices: Vec<u16>,
-        };
+        }
 
         struct RenderWordContext {
             passes: HashMap<u32, PassData>,
-        };
+        }
 
         let line_gap = context.font.get_line_gap();
         let ascent = context.font.get_ascent();
@@ -580,7 +580,9 @@ impl UIWidget for UITextArea {
         self.mouse_x = frame_input.mouse_pos.left;
         self.mouse_y = frame_input.mouse_pos.top;
 
-        if layout.width != self.last_size.width || layout.height != self.last_size.height {
+        if (layout.width - self.last_size.width).abs() > f32::EPSILON
+            || (layout.height - self.last_size.height).abs() > f32::EPSILON
+        {
             self.last_size = UISize {
                 width: layout.width,
                 height: layout.height,
